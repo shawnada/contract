@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Editor, {
   Command,
   EditorZone,
@@ -12,6 +13,12 @@ import docxPlugin from '@hufe921/canvas-editor-plugin-docx'
 import './CanvasEditor.css'
 import debounce from 'lodash.debounce'
 import { updateDoc } from './action'
+import {
+  getComments,
+  createCommentInDb,
+  updateComment,
+  deleteComment,
+} from './comment-action'
 
 // 编辑器配置
 export const options: IEditorOption = {
@@ -45,7 +52,7 @@ export const options: IEditorOption = {
 
 // 批注接口
 interface IComment {
-  id: string
+  groupId: string
   content: string
   additionalContent?: string
   riskLevel?: '高' | '中' | '低'
@@ -53,6 +60,22 @@ interface IComment {
   rangeText: string
   createdDate: string
 }
+
+// 防抖保存批注内容
+const saveComment = debounce(
+  (
+    groupId: string,
+    docId: string,
+    data: {
+      content?: string
+      additionalContent?: string
+      riskLevel?: string
+    }
+  ) => {
+    updateComment(groupId, docId, data)
+  },
+  1000
+)
 
 export default function CanvasEditor({
   id,
@@ -194,8 +217,32 @@ export default function CanvasEditor({
     }
   }, [content, id])
 
-  // 抽取公共的创建批��方法
-  const createComment = (params: {
+  // 在组件加载时获取批注
+  useEffect(() => {
+    async function fetchComments() {
+      const comments = await getComments(id)
+      setCommentList(
+        comments.map(
+          (comment: {
+            groupId: string
+            content: string
+            additionalContent?: string
+            riskLevel?: string
+            userName: string
+            rangeText: string
+            createdDate: Date
+          }) => ({
+            ...comment,
+            createdDate: comment.createdDate.toLocaleString(),
+          })
+        )
+      )
+    }
+    fetchComments()
+  }, [id])
+
+  // 修改创建批注的方法
+  const createComment = async (params: {
     groupId: string
     content?: string
     additionalContent?: string
@@ -204,8 +251,18 @@ export default function CanvasEditor({
     rangeText: string
     autoExpand?: boolean
   }) => {
+    // 先创建到数据库
+    await createCommentInDb(id, {
+      groupId: params.groupId,
+      content: params.content || '',
+      additionalContent: params.additionalContent,
+      riskLevel: params.riskLevel,
+      userName: params.userName,
+      rangeText: params.rangeText,
+    })
+
     const newComment: IComment = {
-      id: params.groupId,
+      groupId: params.groupId,
       content: params.content || '',
       additionalContent: params.additionalContent,
       riskLevel: params.riskLevel,
@@ -216,8 +273,8 @@ export default function CanvasEditor({
 
     setCommentList((prev) => [...prev, newComment])
     if (params.autoExpand) {
-      setActiveCommentId(params.groupId)
-      setEditingCommentId(params.groupId)
+      setActiveCommentId(newComment.groupId)
+      setEditingCommentId(newComment.groupId)
     }
   }
 
@@ -270,32 +327,52 @@ export default function CanvasEditor({
   }
 
   // 定位到批注
-  const handleLocateComment = (commentId: string) => {
-    console.log('Locating comment with ID:', commentId)
+  const handleLocateComment = (groupId: string) => {
+    console.log('Locating comment with ID:', groupId)
 
     try {
-      editorRef.current?.command.executeLocationGroup(commentId)
-      console.log('Location method called successfully')
+      const comment = commentList.find((c) => c.groupId === groupId)
+      if (comment?.groupId) {
+        editorRef.current?.command.executeLocationGroup(comment.groupId)
+        console.log(
+          'Location method called successfully with groupId:',
+          comment.groupId
+        )
+      } else {
+        console.error('No groupId found for comment:', groupId)
+      }
     } catch (error) {
       console.error('Error locating group:', error)
     }
   }
 
-  // 删除批注
-  const handleDeleteComment = (commentId: string) => {
-    editorRef.current?.command.executeDeleteGroup(commentId)
-    setCommentList((prev) => prev.filter((c) => c.id !== commentId))
+  // 修改删除批注的方法
+  const handleDeleteComment = async (groupId: string) => {
+    try {
+      // 直接使用 groupId 删除编辑器中的高亮
+      editorRef.current?.command.executeDeleteGroup(groupId)
+
+      const result = await deleteComment(groupId, id)
+      if (result.success) {
+        setCommentList((prev) => prev.filter((c) => c.groupId !== groupId))
+      } else {
+        console.error('Failed to delete comment:', result.error)
+      }
+    } catch (error) {
+      console.error('Error in handleDeleteComment:', error)
+    }
   }
 
-  // 更新注容的方法
-  const handleUpdateComment = (
-    id: string,
+  // 修改更新批注的方法
+  const handleUpdateComment = async (
+    groupId: string,
     field: 'content' | 'additionalContent' | 'riskLevel',
     newContent: string
   ) => {
+    // 立即更新 UI
     setCommentList((prev) =>
       prev.map((comment) =>
-        comment.id === id
+        comment.groupId === groupId
           ? {
               ...comment,
               [field]: newContent,
@@ -303,10 +380,15 @@ export default function CanvasEditor({
           : comment
       )
     )
+
+    // 防抖保存到数据库
+    saveComment(groupId, id, {
+      [field]: newContent,
+    })
   }
 
   // 修改 textarea 的 onBlur 处理
-  const handleCommentBlur = (commentId: string) => {
+  const handleCommentBlur = (groupId: string) => {
     // 清除之前的延时器
     if (commentEditRef.current.clickTimeout) {
       clearTimeout(commentEditRef.current.clickTimeout)
@@ -324,7 +406,7 @@ export default function CanvasEditor({
   }
 
   // 修改点击进入编辑状态的方法
-  const handleStartEditComment = (commentId: string, e: React.MouseEvent) => {
+  const handleStartEditComment = (groupId: string, e: React.MouseEvent) => {
     // 阻止事件冒泡
     e.stopPropagation()
 
@@ -334,17 +416,17 @@ export default function CanvasEditor({
     }
 
     // 设置编辑状态
-    setEditingCommentId(commentId)
+    setEditingCommentId(groupId)
     commentEditRef.current.isEditing = true
   }
 
   // 修改点击事件处理
-  const handleCommentItemClick = (commentId: string) => {
+  const handleCommentItemClick = (groupId: string) => {
     // 果正在编辑，不进行定位
     if (commentEditRef.current.isEditing) return
 
-    handleLocateComment(commentId)
-    setActiveCommentId(commentId)
+    handleLocateComment(groupId)
+    setActiveCommentId(groupId)
   }
 
   // 搜索高亮添加批注
@@ -432,10 +514,10 @@ export default function CanvasEditor({
       <div className="comment">
         {commentList.map((comment) => (
           <div
-            key={comment.id}
+            key={comment.groupId}
             data-risk={comment.riskLevel}
-            className={`comment-item ${activeCommentId === comment.id ? 'active' : ''}`}
-            onClick={() => handleCommentItemClick(comment.id)}
+            className={`comment-item ${activeCommentId === comment.groupId ? 'active' : ''}`}
+            onClick={() => handleCommentItemClick(comment.groupId)}
           >
             <div className="comment-item__header">
               <span className="comment-item__header-name">
@@ -444,26 +526,30 @@ export default function CanvasEditor({
               <span className="comment-item__header-date">
                 {comment.createdDate}
               </span>
-              <span
+              <button
                 className="comment-item__delete"
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleDeleteComment(comment.id)
+                  handleDeleteComment(comment.groupId)
                 }}
               >
-                删除
-              </span>
+                <X className="h-4 w-4" />
+              </button>
             </div>
             <div className="comment-item__range">原文：{comment.rangeText}</div>
 
-            {editingCommentId === comment.id ? (
+            {editingCommentId === comment.groupId ? (
               <>
                 <div className="comment-item__label">险等级</div>
                 <select
                   className="comment-item__select"
                   value={comment.riskLevel || ''}
                   onChange={(e) =>
-                    handleUpdateComment(comment.id, 'riskLevel', e.target.value)
+                    handleUpdateComment(
+                      comment.groupId,
+                      'riskLevel',
+                      e.target.value
+                    )
                   }
                   onFocus={() => {
                     commentEditRef.current.isEditing = true
@@ -482,9 +568,13 @@ export default function CanvasEditor({
                   rows={2}
                   value={comment.content}
                   onChange={(e) =>
-                    handleUpdateComment(comment.id, 'content', e.target.value)
+                    handleUpdateComment(
+                      comment.groupId,
+                      'content',
+                      e.target.value
+                    )
                   }
-                  onBlur={() => handleCommentBlur(comment.id)}
+                  onBlur={() => handleCommentBlur(comment.groupId)}
                   onFocus={() => {
                     commentEditRef.current.isEditing = true
                   }}
@@ -498,12 +588,12 @@ export default function CanvasEditor({
                   value={comment.additionalContent || ''}
                   onChange={(e) =>
                     handleUpdateComment(
-                      comment.id,
+                      comment.groupId,
                       'additionalContent',
                       e.target.value
                     )
                   }
-                  onBlur={() => handleCommentBlur(comment.id)}
+                  onBlur={() => handleCommentBlur(comment.groupId)}
                   onFocus={() => {
                     commentEditRef.current.isEditing = true
                   }}
@@ -512,7 +602,7 @@ export default function CanvasEditor({
             ) : (
               <div
                 className="comment-item__content"
-                onClick={(e) => handleStartEditComment(comment.id, e)}
+                onClick={(e) => handleStartEditComment(comment.groupId, e)}
               >
                 {comment.content ? (
                   <div>

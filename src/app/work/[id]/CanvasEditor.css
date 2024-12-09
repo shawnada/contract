@@ -117,11 +117,22 @@
   font-size: 0.875rem;
 }
 
-.delete-btn {
+.comment-item__delete {
   background: none;
   border: none;
-  color: red;
+  color: #999;
   cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.comment-item__delete:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #666;
 }
 
 .range-text {
