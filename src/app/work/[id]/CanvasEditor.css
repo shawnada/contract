@@ -1,0 +1,161 @@
+.canvas-editor-container {
+  display: flex;
+  width: 125%;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.canvas-editor {
+  flex-grow: 1;
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding-right: 20px;
+}
+
+.canvas-editor canvas {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+}
+
+.comment {
+  width: 300px;
+  height: 100%;
+  background: #fff;
+  border-left: 1px solid #e2e6ed;
+  overflow: auto;
+}
+
+.comment-sidebar {
+  width: 25%;
+  padding-left: 1rem;
+  border-left: 1px solid #eee;
+}
+
+.comment-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.comment-item {
+  padding: 10px;
+  border-bottom: 1px solid #f2f4f7;
+  cursor: pointer;
+}
+
+.comment-item:hover {
+  background-color: #f5f7fa;
+}
+
+.comment-item.active {
+  background-color: #e6f7ff;
+  border-left: 4px solid #1890ff;
+}
+
+.comment-item__header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.comment-item__header-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.comment-item__header-date {
+  color: #999;
+  font-size: 12px;
+}
+
+.comment-item__content {
+  color: #333;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.comment-item__content div {
+  margin-bottom: 4px;
+}
+
+.comment-item__content .text-sm {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.comment-item__range {
+  color: #666;
+  margin-top: 5px;
+  font-size: 0.875rem;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: red;
+  cursor: pointer;
+}
+
+.range-text {
+  font-style: italic;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+/* 自定义滚动条样式（针对webkit浏览器） */
+.canvas-editor::-webkit-scrollbar {
+  width: 8px;
+}
+
+.canvas-editor::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.canvas-editor::-webkit-scrollbar-thumb {
+  background-color: #e0e0e0;
+  border-radius: 4px;
+}
+
+.comment-item__content-edit {
+  width: 100%;
+  min-height: 50px;
+  max-height: 100px;
+  padding: 5px;
+  border: 1px solid #e2e6ed;
+  border-radius: 4px;
+  resize: vertical;
+  margin-top: 5px;
+}
+
+.comment-item__content-edit.mt-2 {
+  margin-top: 10px;
+}
+
+.comment-item__content {
+  cursor: text;
+  min-height: 30px;
+  padding: 5px;
+  color: #666;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: border-color 0.3s;
+}
+
+.comment-item__content:hover {
+  border-color: #e2e6ed;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.comment-item__label {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 5px;
+  font-weight: 500;
+}

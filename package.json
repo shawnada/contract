@@ -1,0 +1,72 @@
+{
+  "name": "huashuiai-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write --list-different .",
+    "prepare": "husky",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^1.5.1",
+    "@hookform/resolvers": "^3.3.4",
+    "@hufe921/canvas-editor": "^0.9.98",
+    "@hufe921/canvas-editor-plugin-docx": "^0.0.5",
+    "@prisma/client": "^5.11.0",
+    "@radix-ui/react-avatar": "^1.0.4",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-scroll-area": "^1.0.5",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "lodash.debounce": "^4.0.8",
+    "lucide-react": "^0.359.0",
+    "mammoth": "^1.8.0",
+    "next": "14.1.4",
+    "next-auth": "^5.0.0-beta.15",
+    "next-themes": "^0.3.0",
+    "nodemailer": "^6.9.13",
+    "react": "^18",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.51.2",
+    "react-resizable-panels": "^2.0.13",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^2.2.2",
+    "tailwindcss-animate": "^1.0.7",
+    "typed.js": "^2.1.0",
+    "ua-parser-js": "^1.0.37",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.2.1",
+    "@commitlint/config-conventional": "^19.1.0",
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/ua-parser-js": "^0.7.39",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.4",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.0.11",
+    "postcss": "^8",
+    "prettier": "^3.2.5",
+    "prisma": "^5.11.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  }
+}
