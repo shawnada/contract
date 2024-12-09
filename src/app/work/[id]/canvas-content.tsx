@@ -193,22 +193,38 @@ export default function CanvasEditor({
     }
   }, [content, id])
 
-  // 添加批注
-  const handleAddComment = (command: Command) => {
-    const groupId = command.executeSetGroup()
-    if (!groupId) return
-
+  // 抽取公共的创建批注方法
+  const createComment = (params: {
+    groupId: string
+    content?: string
+    additionalContent?: string
+    userName: string
+    rangeText: string
+  }) => {
     const newComment: IComment = {
-      id: groupId,
-      content: '',
-      userName: 'User',
-      rangeText: command.getRangeText(),
+      id: params.groupId,
+      content: params.content || '',
+      additionalContent: params.additionalContent,
+      userName: params.userName,
+      rangeText: params.rangeText,
       createdDate: new Date().toLocaleString(),
     }
 
     setCommentList((prev) => [...prev, newComment])
-    setActiveCommentId(groupId)
-    setEditingCommentId(groupId)
+    setActiveCommentId(params.groupId)
+    setEditingCommentId(params.groupId)
+  }
+
+  // 右键菜单添加批注
+  const handleAddComment = (command: Command) => {
+    const groupId = command.executeSetGroup()
+    if (!groupId) return
+
+    createComment({
+      groupId,
+      userName: 'User',
+      rangeText: command.getRangeText(),
+    })
   }
 
   // 导入Word文档
@@ -324,7 +340,7 @@ export default function CanvasEditor({
     setActiveCommentId(commentId)
   }
 
-  // 新增搜索和高亮关键字的方法
+  // 搜索高亮添加批注
   const handleSearchAndHighlight = () => {
     const riskData = [
       {
@@ -339,37 +355,50 @@ export default function CanvasEditor({
       },
     ]
 
-    if (editorRef.current) {
-      riskData.forEach((item) => {
-        const keyword = item.原文
-        const rangeList = (
-          editorRef.current.command as any
-        ).getKeywordRangeList(keyword)
-
-        rangeList.forEach((range: any) => {
-          range.startIndex -= 1
-          editorRef.current?.command.executeReplaceRange(range)
-          const groupId = editorRef.current?.command.executeSetGroup()
-
-          // 为每个高亮的关键字创建一个批注
-          if (groupId) {
-            const newComment: IComment = {
-              id: groupId,
-              content: item.风险提示,
-              additionalContent: item.修改建议,
-              userName: 'System',
-              rangeText: keyword,
-              createdDate: new Date().toLocaleString(),
-            }
-            setCommentList((prev) => [...prev, newComment])
-
-            // 自动设置为编辑状态，以便用户可以看到详细内容
-            setActiveCommentId(groupId)
-            setEditingCommentId(groupId)
-          }
-        })
-      })
+    // 1. 先检查 editorRef.current 是否存在
+    const editor = editorRef.current
+    if (!editor) {
+      console.error('Editor not initialized')
+      return
     }
+
+    // 2. 遍历所有风险数据
+    riskData.forEach((item) => {
+      try {
+        const keyword = item.原文
+        // 3. 使用类型断言并确保 command 存在
+        const command = editor.command as any
+        const rangeList = command.getKeywordRangeList(keyword)
+
+        // 4. 确保 rangeList 存在且是数组
+        if (Array.isArray(rangeList) && rangeList.length > 0) {
+          rangeList.forEach((range: any) => {
+            try {
+              // 5. 调整范围并创建批注
+              range.startIndex -= 1
+              command.executeReplaceRange(range)
+              const groupId = command.executeSetGroup()
+
+              if (groupId) {
+                createComment({
+                  groupId,
+                  content: item.风险提示,
+                  additionalContent: item.修改建议,
+                  userName: 'System',
+                  rangeText: keyword,
+                })
+              }
+            } catch (error) {
+              console.error('Error processing range:', error)
+            }
+          })
+        } else {
+          console.warn(`No matches found for keyword: ${keyword}`)
+        }
+      } catch (error) {
+        console.error('Error processing risk data item:', error)
+      }
+    })
   }
 
   return (
