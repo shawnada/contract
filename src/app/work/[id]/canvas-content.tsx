@@ -48,6 +48,7 @@ interface IComment {
   id: string
   content: string
   additionalContent?: string
+  riskLevel?: '高' | '中' | '低'
   userName: string
   rangeText: string
   createdDate: string
@@ -193,26 +194,31 @@ export default function CanvasEditor({
     }
   }, [content, id])
 
-  // 抽取公共的创建批注方法
+  // 抽取公共的创建批��方法
   const createComment = (params: {
     groupId: string
     content?: string
     additionalContent?: string
+    riskLevel?: '高' | '中' | '低'
     userName: string
     rangeText: string
+    autoExpand?: boolean
   }) => {
     const newComment: IComment = {
       id: params.groupId,
       content: params.content || '',
       additionalContent: params.additionalContent,
+      riskLevel: params.riskLevel,
       userName: params.userName,
       rangeText: params.rangeText,
       createdDate: new Date().toLocaleString(),
     }
 
     setCommentList((prev) => [...prev, newComment])
-    setActiveCommentId(params.groupId)
-    setEditingCommentId(params.groupId)
+    if (params.autoExpand) {
+      setActiveCommentId(params.groupId)
+      setEditingCommentId(params.groupId)
+    }
   }
 
   // 右键菜单添加批注
@@ -224,6 +230,7 @@ export default function CanvasEditor({
       groupId,
       userName: 'User',
       rangeText: command.getRangeText(),
+      autoExpand: true,
     })
   }
 
@@ -237,7 +244,7 @@ export default function CanvasEditor({
       if (file) {
         try {
           const arrayBuffer = await file.arrayBuffer()
-          // 使用类型断言调用插件方法
+          // 使用类型断言调用插方法
           ;(editorRef.current?.command as any).executeImportDocx({
             arrayBuffer: arrayBuffer,
           })
@@ -280,10 +287,10 @@ export default function CanvasEditor({
     setCommentList((prev) => prev.filter((c) => c.id !== commentId))
   }
 
-  // 更新批注容的方法
+  // 更新注容的方法
   const handleUpdateComment = (
     id: string,
-    field: 'content' | 'additionalContent',
+    field: 'content' | 'additionalContent' | 'riskLevel',
     newContent: string
   ) => {
     setCommentList((prev) =>
@@ -333,7 +340,7 @@ export default function CanvasEditor({
 
   // 修改点击事件处理
   const handleCommentItemClick = (commentId: string) => {
-    // 如果正在编辑，不进行定位
+    // 果正在编辑，不进行定位
     if (commentEditRef.current.isEditing) return
 
     handleLocateComment(commentId)
@@ -345,11 +352,13 @@ export default function CanvasEditor({
     const riskData = [
       {
         原文: '派人协助落实系统实施的基础设施所需的条件',
+        风险等级: '高',
         风险提示: '违约金过高，超过',
         修改建议: '违约金为造成损失的30%',
       },
       {
         原文: '同时向乙方开具税率3%的等额技术服务增值税专用发票',
+        风险等级: '中',
         风险提示: '表述不清晰',
         修改建议: '需要更详细地说明具体情况',
       },
@@ -370,7 +379,7 @@ export default function CanvasEditor({
         const command = editor.command as any
         const rangeList = command.getKeywordRangeList(keyword)
 
-        // 4. 确保 rangeList 存在且是数组
+        // 4. 确保 rangeList 存在且是数
         if (Array.isArray(rangeList) && rangeList.length > 0) {
           rangeList.forEach((range: any) => {
             try {
@@ -384,8 +393,10 @@ export default function CanvasEditor({
                   groupId,
                   content: item.风险提示,
                   additionalContent: item.修改建议,
+                  riskLevel: item.风险等级 as '高' | '中' | '低',
                   userName: 'System',
                   rangeText: keyword,
+                  autoExpand: false,
                 })
               }
             } catch (error) {
@@ -422,6 +433,7 @@ export default function CanvasEditor({
         {commentList.map((comment) => (
           <div
             key={comment.id}
+            data-risk={comment.riskLevel}
             className={`comment-item ${activeCommentId === comment.id ? 'active' : ''}`}
             onClick={() => handleCommentItemClick(comment.id)}
           >
@@ -446,6 +458,23 @@ export default function CanvasEditor({
 
             {editingCommentId === comment.id ? (
               <>
+                <div className="comment-item__label">险等级</div>
+                <select
+                  className="comment-item__select"
+                  value={comment.riskLevel || ''}
+                  onChange={(e) =>
+                    handleUpdateComment(comment.id, 'riskLevel', e.target.value)
+                  }
+                  onFocus={() => {
+                    commentEditRef.current.isEditing = true
+                  }}
+                >
+                  <option value="">请选择风险等级</option>
+                  <option value="高">高</option>
+                  <option value="中">中</option>
+                  <option value="低">低</option>
+                </select>
+
                 <div className="comment-item__label">风险提示</div>
                 <textarea
                   className="comment-item__content-edit"
@@ -487,6 +516,16 @@ export default function CanvasEditor({
               >
                 {comment.content ? (
                   <div>
+                    {comment.riskLevel && (
+                      <div className="text-sm">
+                        风险等级：
+                        <span
+                          className={`risk-level risk-level-${comment.riskLevel}`}
+                        >
+                          {comment.riskLevel}
+                        </span>
+                      </div>
+                    )}
                     <div>风险提示：{comment.content}</div>
                     {comment.additionalContent && (
                       <div className="text-sm text-gray-500 mt-1">
