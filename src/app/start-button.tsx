@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import SignInButton from '@/components/sign-in-button'
 import { Button } from '@/components/ui/button'
-import { Zap, User } from 'lucide-react'
+import { Zap, User, Book } from 'lucide-react'
 import { getUserInfo } from '@/lib/session'
 
 export default async function StartButton() {
@@ -17,11 +17,19 @@ export default async function StartButton() {
   }
 
   return (
-    <Link href="/work">
-      <Button className="text-base" size="lg">
-        <Zap className="h-4 w-4" />
-        &nbsp;创建审批
-      </Button>
-    </Link>
+    <div className="flex gap-4">
+      <Link href="/work">
+        <Button className="text-base" size="lg">
+          <Zap className="h-4 w-4" />
+          &nbsp;开始审核
+        </Button>
+      </Link>
+      <Link href="/rules" target="_blank" rel="noopener noreferrer">
+        <Button className="text-base" size="lg" variant="outline">
+          <Book className="h-4 w-4" />
+          &nbsp;标准管理
+        </Button>
+      </Link>
+    </div>
   )
 }

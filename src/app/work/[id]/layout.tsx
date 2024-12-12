@@ -7,9 +7,10 @@ import WorkNav from '@/components/WorkNav'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Search, Star, LogOut, Trash2, Users } from 'lucide-react'
+import { Home, Book, LogOut, Trash2, Users } from 'lucide-react'
 import UserSettingButton from '@/components/user-setting-button'
 import SignOutButton from '@/components/sign-out-button'
+import Link from 'next/link'
 
 export default function Layout({
   params,
@@ -28,14 +29,23 @@ export default function Layout({
         <div className="flex flex-col h-screen bg-muted text-muted-foreground p-2">
           <div>
             <UserSettingButton />
-            <Button className="w-full justify-start px-2" variant="ghost">
-              <Search className="h-4 w-4" />
-              &nbsp;&nbsp;搜索
-            </Button>
-            <Button className="w-full justify-start px-2" variant="ghost">
-              <Star className="h-4 w-4" />
-              &nbsp;&nbsp;收藏夹
-            </Button>
+            <Link href="/" className="w-full">
+              <Button className="w-full justify-start px-2" variant="ghost">
+                <Home className="h-4 w-4" />
+                &nbsp;&nbsp;主页
+              </Button>
+            </Link>
+            <Link
+              href="/rules"
+              className="w-full"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button className="w-full justify-start px-2" variant="ghost">
+                <Book className="h-4 w-4" />
+                &nbsp;&nbsp;标准设置
+              </Button>
+            </Link>
             {/* <Button className="w-full justify-start px-2" variant="ghost">
               <Users className="h-4 w-4" />
               &nbsp;&nbsp;协同文档

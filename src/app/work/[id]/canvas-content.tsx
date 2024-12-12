@@ -106,6 +106,7 @@ export default function CanvasEditor({
   const [canEditComment, setCanEditComment] = useState(true)
   const [standards, setStandards] = useState<Standard[]>([])
   const [selectedStandard, setSelectedStandard] = useState<string>('')
+  const [isReviewing, setIsReviewing] = useState(false)
 
   // 新增一个 ref 来处理点击事件
   const commentEditRef = useRef<{
@@ -446,24 +447,25 @@ export default function CanvasEditor({
   }
 
   const handleSearchAndHighlight = async (standardId: string) => {
-    // 1. 先检查 editorRef.current 是否存在
-    const editor = editorRef.current
-    if (!editor) {
-      console.error('Editor not initialized')
-      return
-    }
-
-    // 2. 获取富文本全文
-    const fullText = editor.command.getValue().data
-    if (!fullText) {
-      console.warn('No text content in editor')
-      return
-    }
-    const mainText =
-      fullText.main?.map((item: any) => item.value).join('') || ''
-    console.log('Editor Content:', { mainText })
-
+    setIsReviewing(true)
     try {
+      // 1. 先检查 editorRef.current 是否存在
+      const editor = editorRef.current
+      if (!editor) {
+        console.error('Editor not initialized')
+        return
+      }
+
+      // 2. 获取富文本全文
+      const fullText = editor.command.getValue().data
+      if (!fullText) {
+        console.warn('No text content in editor')
+        return
+      }
+      const mainText =
+        fullText.main?.map((item: any) => item.value).join('') || ''
+      console.log('Editor Content:', { mainText })
+
       // 3. 获取选中标准的所有规则
       const response = await fetch(`/api/rules?standardId=${standardId}`)
       if (!response.ok) {
@@ -504,7 +506,7 @@ export default function CanvasEditor({
         riskData = JSON.parse(cleanedResponseText)
       } catch (parseError) {
         console.error('JSON解析错误:', parseError)
-        console.error('原始响应:', responseText)
+        console.error('原始响���:', responseText)
         return
       }
 
@@ -549,6 +551,10 @@ export default function CanvasEditor({
       })
     } catch (error) {
       console.error('Error in handleSearchAndHighlight:', error)
+      // 显示错误提示
+      alert('自动审核失败，请稍后重试')
+    } finally {
+      setIsReviewing(false)
     }
   }
 
@@ -595,9 +601,9 @@ export default function CanvasEditor({
                 await handleSearchAndHighlight(selectedStandard)
               }}
               className="bg-primary text-white hover:bg-primary/90"
-              disabled={!selectedStandard}
+              disabled={!selectedStandard || isReviewing}
             >
-              自动审核
+              {isReviewing ? '审核中...' : '自动审核'}
             </Button>
           </div>
         </div>
