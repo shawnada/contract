@@ -97,3 +97,24 @@ export async function deleteRule(id: string, standardId: string) {
   })
   revalidatePath(`/rules/${standardId}`)
 }
+
+export async function deleteStandard(id: string) {
+  try {
+    const user = await getUserInfo()
+    if (!user?.id) throw new Error('Unauthorized')
+
+    // 删除标准及其关联的所有规则
+    await db.standard.delete({
+      where: {
+        id,
+        userId: user.id, // 确保只能删除自己的标准
+      },
+    })
+
+    revalidatePath('/rules')
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting standard:', error)
+    return { success: false }
+  }
+}

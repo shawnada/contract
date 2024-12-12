@@ -179,7 +179,7 @@ export default function CanvasEditor({
 
       // 增加详细的内容变化日志
       editor.listener.contentChange = () => {
-        console.log('内容发生变化')
+        console.log('内容发生化')
 
         // 安全地获取当前内容
         const currentContent = editor.command.getValue()
@@ -445,23 +445,7 @@ export default function CanvasEditor({
     setActiveCommentId(groupId)
   }
 
-  // 搜索高亮添加批注
-  const handleSearchAndHighlight = () => {
-    const riskData = [
-      {
-        原文: '派人协助落实系统实施的基础设施所需的条件',
-        风险等级: '高',
-        风险提示: '违约金过高，超过',
-        修改建议: '违约金为造成损失的30%',
-      },
-      {
-        原文: '同时向乙方开具税率3%的等额技术服务增值税专用发票',
-        风险等级: '中',
-        风险提示: '表述不清晰',
-        修改建议: '需要更详细地说明具体情况',
-      },
-    ]
-
+  const handleSearchAndHighlight = async (standardId: string) => {
     // 1. 先检查 editorRef.current 是否存在
     const editor = editorRef.current
     if (!editor) {
@@ -469,45 +453,103 @@ export default function CanvasEditor({
       return
     }
 
-    // 2. 遍历所有风险数据
-    riskData.forEach((item) => {
-      try {
-        const keyword = item.原文
-        // 3. 使用类型断言并确保 command 存在
-        const command = editor.command as any
-        const rangeList = command.getKeywordRangeList(keyword)
+    // 2. 获取富文本全文
+    const fullText = editor.command.getValue().data
+    if (!fullText) {
+      console.warn('No text content in editor')
+      return
+    }
+    const mainText =
+      fullText.main?.map((item: any) => item.value).join('') || ''
+    console.log('Editor Content:', { mainText })
 
-        // 4. 确保 rangeList 存在且是数
-        if (Array.isArray(rangeList) && rangeList.length > 0) {
-          rangeList.forEach((range: any) => {
-            try {
-              // 5. 调整范围并创建批注
-              range.startIndex -= 1
-              command.executeReplaceRange(range)
-              const groupId = command.executeSetGroup()
-
-              if (groupId) {
-                createComment({
-                  groupId,
-                  content: item.风险提示,
-                  additionalContent: item.修改建议,
-                  riskLevel: item.风险等级 as '高' | '中' | '低',
-                  userName: 'System',
-                  rangeText: keyword,
-                  autoExpand: false,
-                })
-              }
-            } catch (error) {
-              console.error('Error processing range:', error)
-            }
-          })
-        } else {
-          console.warn(`No matches found for keyword: ${keyword}`)
-        }
-      } catch (error) {
-        console.error('Error processing risk data item:', error)
+    try {
+      // 3. 获取选中标准的所有规则
+      const response = await fetch(`/api/rules?standardId=${standardId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-    })
+      const rules = await response.json()
+      if (!rules || rules.length === 0) {
+        console.warn('No rules found for this standard')
+        return
+      }
+      console.log('Rules from standard:', rules)
+
+      // 4. 调用服务器端 AI 审核 API
+      const aiResponse = await fetch('/api/ai-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rules,
+          mainText,
+        }),
+      })
+
+      if (!aiResponse.ok) {
+        throw new Error('AI review request failed')
+      }
+
+      const { result: responseText } = await aiResponse.json()
+
+      let riskData
+      try {
+        // 移除 markdown 标记并解析 JSON
+        const cleanedResponseText = responseText
+          .replace(/^```json\s*/, '')
+          .replace(/```$/, '')
+          .trim()
+        riskData = JSON.parse(cleanedResponseText)
+      } catch (parseError) {
+        console.error('JSON解析错误:', parseError)
+        console.error('原始响应:', responseText)
+        return
+      }
+
+      // 7. 遍历所有风险数据
+      riskData.forEach((item) => {
+        try {
+          const keyword = item.原文
+          // 3. 使用类型断言并确保 command 存在
+          const command = editor.command as any
+          const rangeList = command.getKeywordRangeList(keyword)
+
+          // 4. 确保 rangeList 存在且是数
+          if (Array.isArray(rangeList) && rangeList.length > 0) {
+            rangeList.forEach((range: any) => {
+              try {
+                // 5. 调整范围并创建批注
+                range.startIndex -= 1
+                command.executeReplaceRange(range)
+                const groupId = command.executeSetGroup()
+
+                if (groupId) {
+                  createComment({
+                    groupId,
+                    content: item.风险提示,
+                    additionalContent: item.修改建议,
+                    riskLevel: item.风险等级 as '高' | '中' | '低',
+                    userName: 'System',
+                    rangeText: keyword,
+                    autoExpand: false,
+                  })
+                }
+              } catch (error) {
+                console.error('Error processing range:', error)
+              }
+            })
+          } else {
+            console.warn(`No matches found for keyword: ${keyword}`)
+          }
+        } catch (error) {
+          console.error('Error processing risk data item:', error)
+        }
+      })
+    } catch (error) {
+      console.error('Error in handleSearchAndHighlight:', error)
+    }
   }
 
   useEffect(() => {
@@ -545,7 +587,13 @@ export default function CanvasEditor({
               </SelectContent>
             </Select>
             <Button
-              onClick={() => handleAutoCheck(selectedStandard)}
+              onClick={async () => {
+                if (!selectedStandard) {
+                  console.warn('No standard selected')
+                  return
+                }
+                await handleSearchAndHighlight(selectedStandard)
+              }}
               className="bg-primary text-white hover:bg-primary/90"
               disabled={!selectedStandard}
             >
