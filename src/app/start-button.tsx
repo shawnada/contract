@@ -20,7 +20,7 @@ export default async function StartButton() {
     <Link href="/work">
       <Button className="text-base" size="lg">
         <Zap className="h-4 w-4" />
-        &nbsp;开始使用
+        &nbsp;创建审批
       </Button>
     </Link>
   )

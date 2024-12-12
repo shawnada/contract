@@ -63,6 +63,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   docs          Doc[]
+  standards     Standard[]
 }
 
 model VerificationToken {
@@ -84,4 +85,29 @@ model Comment {
   createdDate      DateTime @default(now())
   doc              Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
   docId            String
+}
+
+// 审核标准模型
+model Standard {
+  id        String   @id @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  rules     Rule[]
+}
+
+// 审核规则模型
+model Rule {
+  id         String   @id @default(cuid())
+  category   String   // 风险分类
+  level      String   // 风险等级
+  principle  String   // 审核原则
+  clause     String   // 标准条款
+  submitter  String   // 提交人
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  standardId String
 }

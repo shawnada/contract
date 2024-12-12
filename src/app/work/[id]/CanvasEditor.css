@@ -1,6 +1,8 @@
 .canvas-editor-container {
   display: flex;
-  width: 125%;
+  width: 160%;
+  position: relative;
+  left: -40%;
   height: calc(100vh - 80px);
   overflow: hidden;
 }
@@ -12,6 +14,7 @@
   display: flex;
   justify-content: center;
   padding-right: 20px;
+  max-width: 1000px;
 }
 
 .canvas-editor canvas {
@@ -22,26 +25,35 @@
 }
 
 .comment {
-  width: 300px;
+  width: 500px;
   height: 100%;
-  background: #fff;
-  border-left: 1px solid #e2e6ed;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
-.comment-sidebar {
-  width: 25%;
-  padding-left: 1rem;
-  border-left: 1px solid #eee;
+.comment-header {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: white;
+}
+
+.comment-header button {
+  padding: 12px;
+  font-size: 16px;
 }
 
 .comment-list {
-  max-height: 500px;
+  padding: 0 16px 16px;
   overflow-y: auto;
+  flex: 1;
 }
 
 .comment-item {
-  padding: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
   border-bottom: 1px solid #f2f4f7;
   cursor: pointer;
   border-left: 4px solid transparent;
@@ -224,4 +236,13 @@
 .risk-level-低 {
   background-color: #e5e7eb;
   color: #4b5563;
+}
+
+.comment-header .flex {
+  display: flex;
+  align-items: center;
+}
+
+.comment-header .flex > * {
+  min-height: 40px;
 }

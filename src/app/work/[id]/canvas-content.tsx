@@ -19,6 +19,20 @@ import {
   updateComment,
   deleteComment,
 } from './comment-action'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { getStandards } from '../api/standards'
+
+interface Standard {
+  id: string
+  title: string
+}
 
 // 编辑器配置
 export const options: IEditorOption = {
@@ -90,6 +104,8 @@ export default function CanvasEditor({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [canEditComment, setCanEditComment] = useState(true)
+  const [standards, setStandards] = useState<Standard[]>([])
+  const [selectedStandard, setSelectedStandard] = useState<string>('')
 
   // 新增一个 ref 来处理点击事件
   const commentEditRef = useRef<{
@@ -494,142 +510,171 @@ export default function CanvasEditor({
     })
   }
 
+  useEffect(() => {
+    // 获取标准列表
+    const fetchStandards = async () => {
+      const data = await getStandards()
+      setStandards(data)
+      if (data.length > 0) {
+        setSelectedStandard(data[0].id)
+      }
+    }
+    fetchStandards()
+  }, [])
+
   return (
     <div className="canvas-editor-container">
-      {/* 添加搜索按钮 */}
-      <div className="absolute top-2 right-2 z-10">
-        <button
-          onClick={handleSearchAndHighlight}
-          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-        >
-          搜索并高亮
-        </button>
-      </div>
-
-      <div className="canvas-editor">
-        <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
-      </div>
-
-      {/* 批注侧边栏 */}
+      <div className="canvas-editor" ref={containerRef}></div>
       <div className="comment">
-        {commentList.map((comment) => (
-          <div
-            key={comment.groupId}
-            data-risk={comment.riskLevel}
-            className={`comment-item ${activeCommentId === comment.groupId ? 'active' : ''}`}
-            onClick={() => handleCommentItemClick(comment.groupId)}
-          >
-            <div className="comment-item__header">
-              <span className="comment-item__header-name">
-                {comment.userName}
-              </span>
-              <span className="comment-item__header-date">
-                {comment.createdDate}
-              </span>
-              <button
-                className="comment-item__delete"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteComment(comment.groupId)
-                }}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="comment-item__range">原文：{comment.rangeText}</div>
-
-            {editingCommentId === comment.groupId ? (
-              <>
-                <div className="comment-item__label">险等级</div>
-                <select
-                  className="comment-item__select"
-                  value={comment.riskLevel || ''}
-                  onChange={(e) =>
-                    handleUpdateComment(
-                      comment.groupId,
-                      'riskLevel',
-                      e.target.value
-                    )
-                  }
-                  onFocus={() => {
-                    commentEditRef.current.isEditing = true
+        <div className="comment-header">
+          <div className="flex gap-2 mb-4 items-center">
+            <Select
+              value={selectedStandard}
+              onValueChange={setSelectedStandard}
+              className="w-[200px]"
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="选择审核标准" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[100px]">
+                {standards.map((standard) => (
+                  <SelectItem key={standard.id} value={standard.id}>
+                    {standard.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => handleAutoCheck(selectedStandard)}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard}
+            >
+              自动审核
+            </Button>
+          </div>
+        </div>
+        <div className="comment-list">
+          {commentList.map((comment) => (
+            <div
+              key={comment.groupId}
+              data-risk={comment.riskLevel}
+              className={`comment-item ${activeCommentId === comment.groupId ? 'active' : ''}`}
+              onClick={() => handleCommentItemClick(comment.groupId)}
+            >
+              <div className="comment-item__header">
+                <span className="comment-item__header-name">
+                  {comment.userName}
+                </span>
+                <span className="comment-item__header-date">
+                  {comment.createdDate}
+                </span>
+                <button
+                  className="comment-item__delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteComment(comment.groupId)
                   }}
                 >
-                  <option value="">请选择风险等级</option>
-                  <option value="高">高</option>
-                  <option value="中">中</option>
-                  <option value="低">低</option>
-                </select>
-
-                <div className="comment-item__label">风险提示</div>
-                <textarea
-                  className="comment-item__content-edit"
-                  placeholder="请输入风险提示"
-                  rows={2}
-                  value={comment.content}
-                  onChange={(e) =>
-                    handleUpdateComment(
-                      comment.groupId,
-                      'content',
-                      e.target.value
-                    )
-                  }
-                  onBlur={() => handleCommentBlur(comment.groupId)}
-                  onFocus={() => {
-                    commentEditRef.current.isEditing = true
-                  }}
-                  autoFocus
-                />
-                <div className="comment-item__label mt-2">修改建议</div>
-                <textarea
-                  className="comment-item__content-edit mt-2"
-                  placeholder="请输入修改建议"
-                  rows={2}
-                  value={comment.additionalContent || ''}
-                  onChange={(e) =>
-                    handleUpdateComment(
-                      comment.groupId,
-                      'additionalContent',
-                      e.target.value
-                    )
-                  }
-                  onBlur={() => handleCommentBlur(comment.groupId)}
-                  onFocus={() => {
-                    commentEditRef.current.isEditing = true
-                  }}
-                />
-              </>
-            ) : (
-              <div
-                className="comment-item__content"
-                onClick={(e) => handleStartEditComment(comment.groupId, e)}
-              >
-                {comment.content ? (
-                  <div>
-                    {comment.riskLevel && (
-                      <div className="text-sm">
-                        风险等级：
-                        <span
-                          className={`risk-level risk-level-${comment.riskLevel}`}
-                        >
-                          {comment.riskLevel}
-                        </span>
-                      </div>
-                    )}
-                    <div>风险提示：{comment.content}</div>
-                    {comment.additionalContent && (
-                      <div className="text-sm text-gray-500 mt-1">
-                        修改建议：{comment.additionalContent}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  '点击添加批注'
-                )}
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            )}
-          </div>
-        ))}
+              <div className="comment-item__range">
+                原文：{comment.rangeText}
+              </div>
+
+              {editingCommentId === comment.groupId ? (
+                <>
+                  <div className="comment-item__label">险等级</div>
+                  <select
+                    className="comment-item__select"
+                    value={comment.riskLevel || ''}
+                    onChange={(e) =>
+                      handleUpdateComment(
+                        comment.groupId,
+                        'riskLevel',
+                        e.target.value
+                      )
+                    }
+                    onFocus={() => {
+                      commentEditRef.current.isEditing = true
+                    }}
+                  >
+                    <option value="">请选择风险等级</option>
+                    <option value="高">高</option>
+                    <option value="中">中</option>
+                    <option value="低">低</option>
+                  </select>
+
+                  <div className="comment-item__label">风险提示</div>
+                  <textarea
+                    className="comment-item__content-edit"
+                    placeholder="请输入风险提示"
+                    rows={2}
+                    value={comment.content}
+                    onChange={(e) =>
+                      handleUpdateComment(
+                        comment.groupId,
+                        'content',
+                        e.target.value
+                      )
+                    }
+                    onBlur={() => handleCommentBlur(comment.groupId)}
+                    onFocus={() => {
+                      commentEditRef.current.isEditing = true
+                    }}
+                    autoFocus
+                  />
+                  <div className="comment-item__label mt-2">修改建议</div>
+                  <textarea
+                    className="comment-item__content-edit mt-2"
+                    placeholder="请输入修改建议"
+                    rows={2}
+                    value={comment.additionalContent || ''}
+                    onChange={(e) =>
+                      handleUpdateComment(
+                        comment.groupId,
+                        'additionalContent',
+                        e.target.value
+                      )
+                    }
+                    onBlur={() => handleCommentBlur(comment.groupId)}
+                    onFocus={() => {
+                      commentEditRef.current.isEditing = true
+                    }}
+                  />
+                </>
+              ) : (
+                <div
+                  className="comment-item__content"
+                  onClick={(e) => handleStartEditComment(comment.groupId, e)}
+                >
+                  {comment.content ? (
+                    <div>
+                      {comment.riskLevel && (
+                        <div className="text-sm">
+                          风险等级：
+                          <span
+                            className={`risk-level risk-level-${comment.riskLevel}`}
+                          >
+                            {comment.riskLevel}
+                          </span>
+                        </div>
+                      )}
+                      <div>风险提示：{comment.content}</div>
+                      {comment.additionalContent && (
+                        <div className="text-sm text-gray-500 mt-1">
+                          修改建议：{comment.additionalContent}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    '点击添加批注'
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
