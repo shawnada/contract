@@ -196,7 +196,7 @@ export default function CanvasEditor({
       // 注册右键菜单 - 添加批注、导入导出Word
       editor.register.contextMenuList([
         {
-          name: '批注',
+          name: '批���',
           when: (payload) => {
             return (
               !payload.isReadonly &&
@@ -506,7 +506,7 @@ export default function CanvasEditor({
         riskData = JSON.parse(cleanedResponseText)
       } catch (parseError) {
         console.error('JSON解析错误:', parseError)
-        console.error('原始响���:', responseText)
+        console.error('原始响应:', responseText)
         return
       }
 
@@ -558,6 +558,106 @@ export default function CanvasEditor({
     }
   }
 
+  const handleStrictReview = async (standardId: string) => {
+    setIsReviewing(true)
+    try {
+      // 1. 先检查 editorRef.current 是否存在
+      const editor = editorRef.current
+      if (!editor) {
+        console.error('Editor not initialized')
+        return
+      }
+
+      // 2. 获取富文本全文
+      const fullText = editor.command.getValue().data
+      if (!fullText) {
+        console.warn('No text content in editor')
+        return
+      }
+      const mainText =
+        fullText.main?.map((item: any) => item.value).join('') || ''
+
+      // 3. 获取选中标准的所有规则
+      const response = await fetch(`/api/rules?standardId=${standardId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const rules = await response.json()
+      if (!rules || rules.length === 0) {
+        console.warn('No rules found for this standard')
+        return
+      }
+
+      // 4. 逐条规则进行审核
+      for (const rule of rules) {
+        const aiResponse = await fetch('/api/strict-review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            rule,
+            mainText,
+          }),
+        })
+
+        if (!aiResponse.ok) {
+          throw new Error('Strict review request failed')
+        }
+
+        const { result: responseText } = await aiResponse.json()
+
+        try {
+          // 解析 AI 响应
+          const cleanedResponseText = responseText
+            .replace(/^```json\s*/, '')
+            .replace(/```$/, '')
+            .trim()
+          const riskData = JSON.parse(cleanedResponseText)
+
+          // 处理每个风险点
+          riskData.forEach((item: any) => {
+            const keyword = item.原文
+            const command = editor.command as any
+            const rangeList = command.getKeywordRangeList(keyword)
+
+            if (Array.isArray(rangeList) && rangeList.length > 0) {
+              rangeList.forEach((range: any) => {
+                try {
+                  range.startIndex -= 1
+                  command.executeReplaceRange(range)
+                  const groupId = command.executeSetGroup()
+
+                  if (groupId) {
+                    createComment({
+                      groupId,
+                      content: item.风险提示,
+                      additionalContent: item.修改建议,
+                      riskLevel: item.风险等级 as '高' | '中' | '低',
+                      userName: 'System',
+                      rangeText: keyword,
+                      autoExpand: false,
+                    })
+                  }
+                } catch (error) {
+                  console.error('Error processing range:', error)
+                }
+              })
+            }
+          })
+        } catch (parseError) {
+          console.error('JSON解析错误:', parseError)
+          console.error('原始响应:', responseText)
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleStrictReview:', error)
+      alert('严格审核失败，请稍后重试')
+    } finally {
+      setIsReviewing(false)
+    }
+  }
+
   useEffect(() => {
     // 获取标准列表
     const fetchStandards = async () => {
@@ -604,6 +704,19 @@ export default function CanvasEditor({
               disabled={!selectedStandard || isReviewing}
             >
               {isReviewing ? '审核中...' : '自动审核'}
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedStandard) {
+                  console.warn('No standard selected')
+                  return
+                }
+                await handleStrictReview(selectedStandard)
+              }}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard || isReviewing}
+            >
+              {isReviewing ? '审核中...' : '严格审核'}
             </Button>
           </div>
         </div>
