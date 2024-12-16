@@ -32,6 +32,9 @@ import { getStandards } from '../api/standards'
 interface Standard {
   id: string
   title: string
+  user?: {
+    name: string
+  }
 }
 
 // 编辑器配置
@@ -135,7 +138,7 @@ export default function CanvasEditor({
 
       updateDoc(id, { content: contentToSave })
     } catch (error) {
-      console.error('保存内容时发生错误:', error)
+      console.error('保存内容��发生错误:', error)
     }
   }, 1000)
 
@@ -196,7 +199,7 @@ export default function CanvasEditor({
       // 注册右键菜单 - 添加批注、导入导出Word
       editor.register.contextMenuList([
         {
-          name: '批���',
+          name: '批注',
           when: (payload) => {
             return (
               !payload.isReadonly &&
@@ -684,10 +687,11 @@ export default function CanvasEditor({
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="选择审核标准" />
               </SelectTrigger>
-              <SelectContent className="max-h-[100px]">
+              <SelectContent className="max-h-[300px]">
                 {standards.map((standard) => (
                   <SelectItem key={standard.id} value={standard.id}>
-                    {standard.title}
+                    {standard.title}{' '}
+                    {standard.user?.name ? `(${standard.user.name})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

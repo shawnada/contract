@@ -67,6 +67,15 @@ export async function createRule(
       ...data,
       standardId,
     },
+    select: {
+      id: true,
+      category: true,
+      level: true,
+      principle: true,
+      clause: true,
+      submitter: true,
+      createdAt: true,
+    },
   })
   revalidatePath(`/rules/${standardId}`)
   return rule

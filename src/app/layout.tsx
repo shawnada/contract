@@ -16,7 +16,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const isMobile = await isMobileDevice() // 这个函数是异步的？？？
+  const isMobile = await isMobileDevice()
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -31,8 +31,8 @@ export default async function RootLayout({
         {!isMobile && (
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
-            enableSystem
+            defaultTheme="light"
+            enableSystem={false}
             disableTransitionOnChange
           >
             {children}

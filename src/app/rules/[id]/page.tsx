@@ -31,6 +31,7 @@ export default async function StandardPage({
           rules={standard.rules}
           standardId={params.id}
           userName={user.name || ''}
+          standardTitle={standard.title}
         />
       </div>
     </div>
