@@ -696,19 +696,7 @@ export default function CanvasEditor({
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              onClick={async () => {
-                if (!selectedStandard) {
-                  console.warn('No standard selected')
-                  return
-                }
-                await handleSearchAndHighlight(selectedStandard)
-              }}
-              className="bg-primary text-white hover:bg-primary/90"
-              disabled={!selectedStandard || isReviewing}
-            >
-              {isReviewing ? '审核中...' : '自动审核'}
-            </Button>
+
             <Button
               onClick={async () => {
                 if (!selectedStandard) {
@@ -721,6 +709,19 @@ export default function CanvasEditor({
               disabled={!selectedStandard || isReviewing}
             >
               {isReviewing ? '审核中...' : '严格审核'}
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedStandard) {
+                  console.warn('No standard selected')
+                  return
+                }
+                await handleSearchAndHighlight(selectedStandard)
+              }}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard || isReviewing}
+            >
+              {isReviewing ? '审核中...' : '测试用'}
             </Button>
           </div>
         </div>

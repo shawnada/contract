@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import debounce from 'lodash.debounce'
 import { updateDoc } from './action'
+import ImportDocButton from './import-doc-button'
 
 const saveTitle = debounce((id: string, title: string) => {
   updateDoc(id, { title })
@@ -19,14 +20,16 @@ export default function Title(props: { id: string; title: string }) {
   }
 
   return (
-    <div className="mb-8">
-      <Input
-        placeholder="请输入标题..."
-        value={title}
-        onChange={handleChange}
-        className="border-none p-0 text-4xl font-bold focus-visible:ring-transparent"
-      />
-      {/* 可能还会再增加其他功能，例如设置 Icon 、背景等 */}
+    <div className="mb-8 flex items-center gap-4">
+      <div className="max-w-[200px] ml-40">
+        <Input
+          placeholder="请输入标题..."
+          value={title}
+          onChange={handleChange}
+          className="border-none p-0 text-xl font-bold focus-visible:ring-transparent"
+        />
+      </div>
+      <ImportDocButton id={props.id} />
     </div>
   )
 }

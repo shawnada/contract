@@ -11,7 +11,13 @@ export default async function RulesLayout({
   if (!user || !user.id) return null
 
   const standards = await db.standard.findMany({
-    where: { userId: user.id },
+    include: {
+      user: {
+        select: {
+          name: true,
+        },
+      },
+    },
     orderBy: { updatedAt: 'desc' },
   })
 

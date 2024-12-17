@@ -21,6 +21,9 @@ interface Standard {
   id: string
   title: string
   updatedAt: Date
+  user: {
+    name: string | null
+  }
 }
 
 export default function StandardList({ standards }: { standards: Standard[] }) {
@@ -40,6 +43,8 @@ export default function StandardList({ standards }: { standards: Standard[] }) {
       if (standardId === currentId) {
         router.push('/rules')
       }
+    } else {
+      alert(result.error || '删除失败')
     }
   }
 
@@ -63,8 +68,13 @@ export default function StandardList({ standards }: { standards: Standard[] }) {
             >
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">{standard.title}</div>
-                <div className="text-xs text-gray-500">
-                  {new Date(standard.updatedAt).toLocaleString()}
+                <div className="text-xs space-y-1">
+                  <div className="text-gray-500">
+                    更新时间：{new Date(standard.updatedAt).toLocaleString()}
+                  </div>
+                  <div className="text-gray-500">
+                    创建人：{standard.user?.name || '未知'}
+                  </div>
                 </div>
               </div>
               <AlertDialog>

@@ -1,8 +1,8 @@
 .canvas-editor-container {
   display: flex;
-  width: 160%;
+  width: 150%;
   position: relative;
-  left: -40%;
+  left: 0%;
   height: calc(100vh - 80px);
   overflow: hidden;
 }

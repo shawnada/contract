@@ -4,6 +4,11 @@ import { db } from '@/db/db'
 import { revalidatePath } from 'next/cache'
 import { getUserInfo } from '@/lib/session'
 
+// 添加管理员检查函数
+function isAdmin(email: string): boolean {
+  return email === 'jx@zlsoft.com'
+}
+
 export async function getStandard(id: string) {
   try {
     const user = await getUserInfo()
@@ -12,10 +17,14 @@ export async function getStandard(id: string) {
     const standard = await db.standard.findUnique({
       where: {
         id,
-        userId: user.id,
       },
       include: {
         rules: true,
+        user: {
+          select: {
+            name: true,
+          },
+        },
       },
     })
 
@@ -44,12 +53,26 @@ export async function updateStandard(id: string, data: { title?: string }) {
   const user = await getUserInfo()
   if (!user?.id) throw new Error('Unauthorized')
 
-  const standard = await db.standard.update({
-    where: { id, userId: user.id },
+  const standard = await db.standard.findUnique({
+    where: { id },
+    select: { userId: true },
+  })
+
+  if (!standard) {
+    throw new Error('Standard not found')
+  }
+
+  // 检查是否是创建者或管理员
+  if (standard.userId !== user.id && !isAdmin(user.email || '')) {
+    throw new Error('Only the creator can update this standard')
+  }
+
+  const updatedStandard = await db.standard.update({
+    where: { id },
     data,
   })
   revalidatePath('/rules')
-  return standard
+  return updatedStandard
 }
 
 export async function createRule(
@@ -112,18 +135,31 @@ export async function deleteStandard(id: string) {
     const user = await getUserInfo()
     if (!user?.id) throw new Error('Unauthorized')
 
-    // 删除标准及其关联的所有规则
+    const standard = await db.standard.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+
+    if (!standard) {
+      return { success: false, error: 'Standard not found' }
+    }
+
+    // 检查是否是创建者或管理员
+    if (standard.userId !== user.id && !isAdmin(user.email || '')) {
+      return {
+        success: false,
+        error: 'Unauthorized: Only the creator can delete this standard',
+      }
+    }
+
     await db.standard.delete({
-      where: {
-        id,
-        userId: user.id, // 确保只能删除自己的标准
-      },
+      where: { id },
     })
 
     revalidatePath('/rules')
     return { success: true }
   } catch (error) {
     console.error('Error deleting standard:', error)
-    return { success: false }
+    return { success: false, error: error.message }
   }
 }
