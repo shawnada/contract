@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { FileUp } from 'lucide-react'
 import { useState } from 'react'
 import { updateDoc } from './action'
+import { useEditorContext } from './editor-context'
 
 export default function ImportDocButton({ id }: { id: string }) {
   const [isLoading, setIsLoading] = useState(false)
+  const { editorRef } = useEditorContext()
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -16,13 +18,11 @@ export default function ImportDocButton({ id }: { id: string }) {
       setIsLoading(true)
       console.log('开始导入文件:', file.name)
 
-      // 创建 FormData
       const formData = new FormData()
       formData.append('file', file)
 
       console.log('准备发送请求到转换接口...')
 
-      // 调用本地 API 路由
       const response = await fetch('/api/convert-doc', {
         method: 'POST',
         body: formData,
@@ -40,28 +40,44 @@ export default function ImportDocButton({ id }: { id: string }) {
       const htmlContent = await response.text()
       console.log('成功获取转换后的HTML内容，长度:', htmlContent.length)
 
-      // 将HTML内容转换为编辑器需要的格式
-      const content = {
-        header: [{ value: '', size: 15 }],
-        main: [{ value: htmlContent, size: 16 }],
-        footer: [{ value: '', size: 12 }],
+      // 使用 canvas-editor 的 API 插入 HTML
+      if (editorRef.current?.command) {
+        console.log('Editor instance found:', editorRef.current)
+        try {
+          editorRef.current.command.executeSetHTML({
+            header: '',
+            main: htmlContent,
+            footer: '',
+          })
+          console.log('HTML content set successfully')
+
+          // 保存到数据库
+          await updateDoc(id, {
+            content: JSON.stringify({
+              header: [{ value: '', size: 15 }],
+              main: [{ value: htmlContent, size: 16 }],
+              footer: [{ value: '', size: 12 }],
+            }),
+          })
+
+          console.log('文档更新成功')
+        } catch (error) {
+          console.error('Error setting HTML content:', error)
+          throw error
+        }
+      } else {
+        console.error('Editor instance details:', {
+          editorRef: editorRef,
+          current: editorRef.current,
+          hasCommand: editorRef.current?.command,
+        })
+        throw new Error('编辑器实例未找到')
       }
-
-      console.log('准备更新文档内容...')
-
-      // 更新文档内容
-      await updateDoc(id, { content: JSON.stringify(content) })
-
-      console.log('文档更新成功，准备刷新页面')
-
-      // 刷新页面以显示新内容
-      window.location.reload()
     } catch (error) {
       console.error('导入文档失败，详细错误:', error)
       alert('导入文档失败，请重试')
     } finally {
       setIsLoading(false)
-      // 清空 input 的值，允许重复导入同一个文件
       e.target.value = ''
     }
   }

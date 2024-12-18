@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { getStandards } from '../api/standards'
+import { useEditorContext } from './editor-context'
 
 interface Standard {
   id: string
@@ -102,7 +103,7 @@ export default function CanvasEditor({
   content: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<Editor | null>(null)
+  const { editorRef } = useEditorContext()
   const [commentList, setCommentList] = useState<IComment[]>([])
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -138,7 +139,7 @@ export default function CanvasEditor({
 
       updateDoc(id, { content: contentToSave })
     } catch (error) {
-      console.error('保存内容��发生错误:', error)
+      console.error('保存内容发生错误:', error)
     }
   }, 1000)
 
@@ -179,6 +180,7 @@ export default function CanvasEditor({
       // Use the docx plugin
       editor.use(docxPlugin)
 
+      // 将 editor 实例保存到共享的 ref 中
       editorRef.current = editor
 
       // 增加详细的内容变化日志
@@ -235,7 +237,7 @@ export default function CanvasEditor({
     return () => {
       editorRef.current?.destroy()
     }
-  }, [content, id])
+  }, [content, id, editorRef])
 
   // 在组件加载时获取批注
   useEffect(() => {
