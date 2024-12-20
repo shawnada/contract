@@ -10,9 +10,16 @@ export default function ImportDocButton({ id }: { id: string }) {
   const [isLoading, setIsLoading] = useState(false)
   const { editorRef } = useEditorContext()
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert('文件过大，请选择小于10MB的文件')
+      return
+    }
 
     try {
       setIsLoading(true)
@@ -75,7 +82,7 @@ export default function ImportDocButton({ id }: { id: string }) {
       }
     } catch (error) {
       console.error('导入文档失败，详细错误:', error)
-      alert('导入文档失败，请重试')
+      alert('导入文档失败，请确保文件格式正确并重试')
     } finally {
       setIsLoading(false)
       e.target.value = ''

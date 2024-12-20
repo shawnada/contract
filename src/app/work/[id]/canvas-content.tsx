@@ -145,99 +145,128 @@ export default function CanvasEditor({
 
   useEffect(() => {
     if (containerRef.current) {
-      // 尝试解析初始内容
-      let initialData: {
-        header?: IElement[]
-        main?: IElement[]
-        footer?: IElement[]
-      } = {}
-      try {
-        initialData = content
-          ? JSON.parse(content)
-          : {
+      const initializeEditor = () => {
+        try {
+          // 检查容器尺寸
+          if (!containerRef.current?.offsetWidth) {
+            console.warn('Container not ready, retrying...')
+            setTimeout(initializeEditor, 100) // 如果容器未准备好，100ms后重试
+            return
+          }
+
+          // 尝试解析初始内容
+          let initialData: {
+            header?: IElement[]
+            main?: IElement[]
+            footer?: IElement[]
+          } = {}
+          try {
+            initialData = content
+              ? JSON.parse(content)
+              : {
+                  header: [{ value: '', size: 15 }],
+                  main: [{ value: '', size: 16 }],
+                  footer: [{ value: '', size: 12 }],
+                }
+          } catch (error) {
+            console.error('解析初始内容失败', error)
+            initialData = {
               header: [{ value: '', size: 15 }],
               main: [{ value: '', size: 16 }],
               footer: [{ value: '', size: 12 }],
             }
-      } catch (error) {
-        console.error('解析初始内容失败', error)
-        initialData = {
-          header: [{ value: '', size: 15 }],
-          main: [{ value: '', size: 16 }],
-          footer: [{ value: '', size: 12 }],
+          }
+
+          // 确保每个部分都有默认值
+          const editorData = {
+            header: initialData.header || [{ value: '', size: 15 }],
+            main: initialData.main || [{ value: '', size: 16 }],
+            footer: initialData.footer || [{ value: '', size: 12 }],
+          }
+
+          // 检查现有的编辑器实例
+          if (editorRef.current) {
+            editorRef.current.destroy()
+            editorRef.current = null
+          }
+
+          const editor = new Editor(containerRef.current, editorData, options)
+          editor.use(docxPlugin)
+          editorRef.current = editor
+
+          // 增加详细的内容变化日志
+          editor.listener.contentChange = () => {
+            if (!editor || !editor.command) return
+
+            console.log('内容发生变化')
+            const currentContent = editor.command.getValue()
+            saveContent(id, currentContent)
+          }
+
+          // 注册右键菜单
+          editor.register.contextMenuList([
+            {
+              name: '批注',
+              when: (payload) => {
+                return (
+                  !payload.isReadonly &&
+                  payload.editorHasSelection &&
+                  payload.zone === EditorZone.MAIN
+                )
+              },
+              callback: (command: Command) => {
+                handleAddComment(command)
+              },
+            },
+            {
+              name: '导入Word',
+              when: (payload) => {
+                return !payload.isReadonly
+              },
+              callback: () => {
+                handleImportDocx()
+              },
+            },
+            {
+              name: '导出Word',
+              when: (payload) => {
+                return !payload.isReadonly
+              },
+              callback: () => {
+                handleExportDocx()
+              },
+            },
+          ])
+        } catch (error) {
+          console.error('Editor initialization failed:', error)
+          // 可以在这里添加用户提示
+          alert('编辑器初始化失败，请刷新页面重试')
         }
       }
 
-      // 确保每个部分都有默认值
-      const editorData = {
-        header: initialData.header || [{ value: '', size: 15 }],
-        main: initialData.main || [{ value: '', size: 16 }],
-        footer: initialData.footer || [{ value: '', size: 12 }],
-      }
-
-      const editor = new Editor(containerRef.current, editorData, options)
-
-      // Use the docx plugin
-      editor.use(docxPlugin)
-
-      // 将 editor 实例保存到共享的 ref 中
-      editorRef.current = editor
-
-      // 增加详细的内容变化日志
-      editor.listener.contentChange = () => {
-        console.log('内容发生化')
-
-        // 安全地获取当前内容
-        const currentContent = editor.command.getValue()
-        console.log(
-          '当前主内容:',
-          currentContent.data?.main?.map((item: any) => item.value).join('') ||
-            ''
-        )
-
-        saveContent(id, currentContent)
-      }
-
-      // 注册右键菜单 - 添加批注、导入导出Word
-      editor.register.contextMenuList([
-        {
-          name: '批注',
-          when: (payload) => {
-            return (
-              !payload.isReadonly &&
-              payload.editorHasSelection &&
-              payload.zone === EditorZone.MAIN
-            )
-          },
-          callback: (command: Command) => {
-            handleAddComment(command)
-          },
-        },
-        {
-          name: '导入Word',
-          when: (payload) => {
-            return !payload.isReadonly
-          },
-          callback: () => {
-            handleImportDocx()
-          },
-        },
-        {
-          name: '导出Word',
-          when: (payload) => {
-            return !payload.isReadonly
-          },
-          callback: () => {
-            handleExportDocx()
-          },
-        },
-      ])
+      // 启动初始化流程
+      initializeEditor()
     }
 
     return () => {
-      editorRef.current?.destroy()
+      if (editorRef.current) {
+        try {
+          editorRef.current.destroy()
+        } catch (error) {
+          console.error('Error destroying editor:', error)
+        }
+        editorRef.current = null
+      }
     }
-  }, [content, id, editorRef])
+  }, [
+    content,
+    id,
+    editorRef,
+    handleAddComment,
+    handleExportDocx,
+    handleImportDocx,
+    saveContent,
+  ])
 
   // 在组件加载时获取批注
   useEffect(() => {
