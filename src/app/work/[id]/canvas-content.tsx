@@ -143,6 +143,93 @@ export default function CanvasEditor({
     }
   }, 1000)
 
+  // 1. 首先定义所有回调函数
+  const createComment = useCallback(
+    async (params: {
+      groupId: string
+      content?: string
+      additionalContent?: string
+      riskLevel?: '高' | '中' | '低'
+      userName: string
+      rangeText: string
+      autoExpand?: boolean
+    }) => {
+      await createCommentInDb(id, {
+        groupId: params.groupId,
+        content: params.content || '',
+        additionalContent: params.additionalContent,
+        riskLevel: params.riskLevel,
+        userName: params.userName,
+        rangeText: params.rangeText,
+      })
+
+      const newComment: IComment = {
+        groupId: params.groupId,
+        content: params.content || '',
+        additionalContent: params.additionalContent,
+        riskLevel: params.riskLevel,
+        userName: params.userName,
+        rangeText: params.rangeText,
+        createdDate: new Date().toLocaleString(),
+      }
+
+      setCommentList((prev) => [...prev, newComment])
+      if (params.autoExpand) {
+        setActiveCommentId(newComment.groupId)
+        setEditingCommentId(newComment.groupId)
+      }
+    },
+    [id]
+  )
+
+  const handleAddComment = useCallback(
+    (command: Command) => {
+      const groupId = command.executeSetGroup()
+      if (!groupId) return
+
+      createComment({
+        groupId,
+        userName: 'User',
+        rangeText: command.getRangeText(),
+        autoExpand: true,
+      })
+    },
+    [createComment]
+  )
+
+  const handleImportDocx = useCallback(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.docx'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        try {
+          const arrayBuffer = await file.arrayBuffer()
+          ;(editorRef.current?.command as any).executeImportDocx({
+            arrayBuffer: arrayBuffer,
+          })
+        } catch (error) {
+          console.error('Error importing DOCX:', error)
+          alert('导入Word文档失败')
+        }
+      }
+    }
+    input.click()
+  }, [editorRef])
+
+  const handleExportDocx = useCallback(() => {
+    try {
+      ;(editorRef.current?.command as any).executeExportDocx({
+        fileName: `document_${new Date().toISOString().replace(/:/g, '-')}.docx`,
+      })
+    } catch (error) {
+      console.error('Error exporting DOCX:', error)
+      alert('导出Word文档失败')
+    }
+  }, [editorRef])
+
+  // 2. 然后是 useEffect
   useEffect(() => {
     if (containerRef.current) {
       const initializeEditor = () => {
@@ -291,96 +378,6 @@ export default function CanvasEditor({
     }
     fetchComments()
   }, [id])
-
-  // 将 createComment 包装在 useCallback 中
-  const createComment = useCallback(
-    async (params: {
-      groupId: string
-      content?: string
-      additionalContent?: string
-      riskLevel?: '高' | '中' | '低'
-      userName: string
-      rangeText: string
-      autoExpand?: boolean
-    }) => {
-      // 先创建到数据库
-      await createCommentInDb(id, {
-        groupId: params.groupId,
-        content: params.content || '',
-        additionalContent: params.additionalContent,
-        riskLevel: params.riskLevel,
-        userName: params.userName,
-        rangeText: params.rangeText,
-      })
-
-      const newComment: IComment = {
-        groupId: params.groupId,
-        content: params.content || '',
-        additionalContent: params.additionalContent,
-        riskLevel: params.riskLevel,
-        userName: params.userName,
-        rangeText: params.rangeText,
-        createdDate: new Date().toLocaleString(),
-      }
-
-      setCommentList((prev) => [...prev, newComment])
-      if (params.autoExpand) {
-        setActiveCommentId(newComment.groupId)
-        setEditingCommentId(newComment.groupId)
-      }
-    },
-    [id, setCommentList, setActiveCommentId, setEditingCommentId]
-  )
-
-  // 右键菜单添加批注
-  const handleAddComment = useCallback(
-    (command: Command) => {
-      const groupId = command.executeSetGroup()
-      if (!groupId) return
-
-      createComment({
-        groupId,
-        userName: 'User',
-        rangeText: command.getRangeText(),
-        autoExpand: true,
-      })
-    },
-    [createComment]
-  )
-
-  // 导入Word文档
-  const handleImportDocx = useCallback(() => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.docx'
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        try {
-          const arrayBuffer = await file.arrayBuffer()
-          ;(editorRef.current?.command as any).executeImportDocx({
-            arrayBuffer: arrayBuffer,
-          })
-        } catch (error) {
-          console.error('Error importing DOCX:', error)
-          alert('导入Word文档失败')
-        }
-      }
-    }
-    input.click()
-  }, [editorRef])
-
-  // 导出Word文档
-  const handleExportDocx = useCallback(() => {
-    try {
-      ;(editorRef.current?.command as any).executeExportDocx({
-        fileName: `document_${new Date().toISOString().replace(/:/g, '-')}.docx`,
-      })
-    } catch (error) {
-      console.error('Error exporting DOCX:', error)
-      alert('导出Word文档失败')
-    }
-  }, [editorRef])
 
   // 定位到批注
   const handleLocateComment = (groupId: string) => {
