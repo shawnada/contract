@@ -111,6 +111,11 @@ export default function CanvasEditor({
   const [standards, setStandards] = useState<Standard[]>([])
   const [selectedStandard, setSelectedStandard] = useState<string>('')
   const [isReviewing, setIsReviewing] = useState(false)
+  const [reviewProgress, setReviewProgress] = useState<{
+    current: number
+    total: number
+    currentRule?: string
+  }>({ current: 0, total: 0 })
 
   // 新增一个 ref 来处理点击事件
   const commentEditRef = useRef<{
@@ -381,21 +386,19 @@ export default function CanvasEditor({
 
   // 定位到批注
   const handleLocateComment = (groupId: string) => {
-    console.log('Locating comment with ID:', groupId)
+    // 如果是手动创建的批注（没有高亮），则不执行定位
+    if (groupId.startsWith('manual-')) {
+      console.log('This is a non-highlighted comment, skipping location')
+      return
+    }
 
     try {
       const comment = commentList.find((c) => c.groupId === groupId)
       if (comment?.groupId) {
         editorRef.current?.command.executeLocationGroup(comment.groupId)
-        console.log(
-          'Location method called successfully with groupId:',
-          comment.groupId
-        )
-      } else {
-        console.error('No groupId found for comment:', groupId)
       }
     } catch (error) {
-      console.error('Error locating group:', error)
+      console.error('Error locating comment:', error)
     }
   }
 
@@ -504,87 +507,160 @@ export default function CanvasEditor({
 
       // 3. 获取选中标准的所有规则
       const response = await fetch(`/api/rules?standardId=${standardId}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
       const rules = await response.json()
-      if (!rules || rules.length === 0) {
-        console.warn('No rules found for this standard')
-        return
-      }
-      console.log('Rules from standard:', rules)
 
-      // 4. 调用服务器端 AI 审核 API
-      const aiResponse = await fetch('/api/ai-review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rules,
-          mainText,
-        }),
+      // 设置进度初始值
+      setReviewProgress({
+        current: 0,
+        total: rules.length,
+        currentRule: rules[0]?.category,
       })
 
-      if (!aiResponse.ok) {
-        throw new Error('AI review request failed')
-      }
+      // 逐条规则进行审核
+      for (const [index, rule] of rules.entries()) {
+        setReviewProgress({
+          current: index + 1,
+          total: rules.length,
+          currentRule: rule.category,
+        })
 
-      const { result: responseText } = await aiResponse.json()
+        console.group(`正在审核规则: ${rule.category}`)
+        console.log('当前规则详情:', rule)
 
-      let riskData
-      try {
-        // 移除 markdown 标记并解析 JSON
-        const cleanedResponseText = responseText
-          .replace(/^```json\s*/, '')
-          .replace(/```$/, '')
-          .trim()
-        riskData = JSON.parse(cleanedResponseText)
-      } catch (parseError) {
-        console.error('JSON解析错误:', parseError)
-        console.error('原始响应:', responseText)
-        return
-      }
+        let isValidResponse = false
+        let retryCount = 0
+        const MAX_RETRIES = 3
 
-      // 7. 遍历所有风险数据
-      riskData.forEach((item) => {
-        try {
-          const keyword = item.原文
-          // 3. 使用类型断言并确保 command 存在
-          const command = editor.command as any
-          const rangeList = command.getKeywordRangeList(keyword)
+        while (!isValidResponse && retryCount < MAX_RETRIES) {
+          const aiResponse = await fetch('/api/strict-review', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              rule,
+              mainText,
+            }),
+          })
 
-          // 4. 确保 rangeList 存在且是数
-          if (Array.isArray(rangeList) && rangeList.length > 0) {
-            rangeList.forEach((range: any) => {
-              try {
-                // 5. 调整范围并创建批注
-                range.startIndex -= 1
-                command.executeReplaceRange(range)
-                const groupId = command.executeSetGroup()
+          console.log('API Response status:', aiResponse.status)
+          const responseData = await aiResponse.json()
+          console.log('API Response data:', responseData)
 
-                if (groupId) {
-                  createComment({
-                    groupId,
-                    content: item.风险提示,
-                    additionalContent: item.修改建议,
-                    riskLevel: item.风险等级 as '高' | '中' | '低',
-                    userName: 'System',
-                    rangeText: keyword,
-                    autoExpand: false,
-                  })
-                }
-              } catch (error) {
-                console.error('Error processing range:', error)
-              }
-            })
-          } else {
-            console.warn(`No matches found for keyword: ${keyword}`)
+          if (!aiResponse.ok) {
+            throw new Error(
+              responseData.error || 'Strict review request failed'
+            )
           }
-        } catch (error) {
-          console.error('Error processing risk data item:', error)
+
+          const { result: responseText } = responseData
+          console.log('AI 原始响应:', responseText)
+
+          try {
+            const cleanedResponseText = responseText
+              .replace(/^```json\s*/, '')
+              .replace(/```$/, '')
+              .trim()
+            const riskData = JSON.parse(cleanedResponseText)
+
+            // 打印解析后的风险数据
+            console.log('解析后的风险数据:', {
+              ruleId: rule.id,
+              riskCount: riskData.length,
+              risks: riskData,
+            })
+
+            // 检查每个风险项
+            for (const item of riskData) {
+              if (item.是否找到风险 === '否') {
+                console.log('未找到风险，跳过当前规则')
+                isValidResponse = true
+                break
+              }
+
+              if (item.是否找到风险 === '是') {
+                if (item.是否符合要求 === '是') {
+                  try {
+                    const keyword = item.原文
+                    // 使用编辑器的命令查找和高亮文本
+                    const command = editor.command as any
+                    const rangeList = command.getKeywordRangeList(keyword)
+
+                    if (Array.isArray(rangeList) && rangeList.length > 0) {
+                      // 找到匹配的文本，创建高亮批注
+                      rangeList.forEach((range: any) => {
+                        try {
+                          range.startIndex -= 1
+                          command.executeReplaceRange(range)
+                          const groupId = command.executeSetGroup()
+
+                          if (groupId) {
+                            createComment({
+                              groupId,
+                              content: `${item.风险提示}${
+                                item.主要增加哪方的风险
+                                  ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                                  : ''
+                              }`,
+                              additionalContent: item.修改建议,
+                              riskLevel: item.风险等级 as '高' | '中' | '低',
+                              userName: 'System',
+                              rangeText: keyword,
+                              autoExpand: false,
+                            })
+                          }
+                        } catch (error) {
+                          console.error(
+                            'Error creating highlight comment:',
+                            error
+                          )
+                        }
+                      })
+                    } else {
+                      // 如果找不到匹配的文本，创建不带高亮的批注
+                      console.warn(`No matches found for keyword: "${keyword}"`)
+                      const manualGroupId = generateUUID()
+                      createComment({
+                        groupId: manualGroupId,
+                        content: `${item.风险提示}${
+                          item.主要增加哪方的风险
+                            ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                            : ''
+                        }`,
+                        additionalContent: item.修改建议,
+                        riskLevel: item.风险等级 as '高' | '中' | '低',
+                        userName: 'System',
+                        rangeText: `原文："${keyword}"（未找到）`,
+                        autoExpand: false,
+                      })
+                    }
+                    isValidResponse = true
+                  } catch (error) {
+                    console.error('Error processing risk item:', error)
+                  }
+                } else {
+                  console.log('审核结果不符合要求，原因:', item.不符合原因)
+                  console.log('重试第', retryCount + 1, '次')
+                  retryCount++
+                  break
+                }
+              }
+            }
+          } catch (parseError) {
+            console.error('JSON解析错误:', {
+              error: parseError,
+              responseText: responseText,
+            })
+            retryCount++
+          }
         }
-      })
+
+        if (retryCount >= MAX_RETRIES) {
+          console.warn(`规则 ${rule.category} 达到最大重试次数，跳过`)
+        }
+
+        console.groupEnd()
+      }
     } catch (error) {
       console.error('Error in handleSearchAndHighlight:', error)
       // 显示错误提示
@@ -596,101 +672,191 @@ export default function CanvasEditor({
 
   const handleStrictReview = async (standardId: string) => {
     setIsReviewing(true)
-    try {
-      // 1. 先检查 editorRef.current 是否存在
-      const editor = editorRef.current
-      if (!editor) {
-        console.error('Editor not initialized')
-        return
-      }
+    const editor = editorRef.current
+    if (!editor) {
+      console.warn('Editor not initialized')
+      setIsReviewing(false)
+      return
+    }
 
-      // 2. 获取富文本全文
+    try {
+      // 获取富文本全文
       const fullText = editor.command.getValue().data
       if (!fullText) {
         console.warn('No text content in editor')
+        setIsReviewing(false)
         return
       }
       const mainText =
         fullText.main?.map((item: any) => item.value).join('') || ''
 
-      // 3. 获取选中标准的所有规则
-      const response = await fetch(`/api/rules?standardId=${standardId}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const rules = await response.json()
-      if (!rules || rules.length === 0) {
-        console.warn('No rules found for this standard')
-        return
-      }
+      // 打印文档内容
+      console.log(`待审核的文档内容 (总长度: ${mainText.length} 字符):`)
+      console.log(mainText)
+      console.log('----------------------------------------')
 
-      // 4. 逐条规则进行审核
-      for (const rule of rules) {
-        const aiResponse = await fetch('/api/strict-review', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            rule,
-            mainText,
-          }),
+      // 获取选中的规则
+      const response = await fetch(`/api/rules?standardId=${standardId}`)
+      const rules = await response.json()
+
+      // 设置进度初始值
+      setReviewProgress({
+        current: 0,
+        total: rules.length,
+        currentRule: rules[0]?.category,
+      })
+
+      // 逐条规则进行审核
+      for (const [index, rule] of rules.entries()) {
+        setReviewProgress({
+          current: index + 1,
+          total: rules.length,
+          currentRule: rule.category,
         })
 
-        if (!aiResponse.ok) {
-          throw new Error('Strict review request failed')
-        }
+        console.group(`正在审核规则: ${rule.category}`)
+        console.log('当前规则详情:', rule)
 
-        const { result: responseText } = await aiResponse.json()
+        let isValidResponse = false
+        let retryCount = 0
+        const MAX_RETRIES = 3
 
-        try {
-          // 解析 AI 响应
-          const cleanedResponseText = responseText
-            .replace(/^```json\s*/, '')
-            .replace(/```$/, '')
-            .trim()
-          const riskData = JSON.parse(cleanedResponseText)
-
-          // 处理每个风险点
-          riskData.forEach((item: any) => {
-            const keyword = item.原文
-            const command = editor.command as any
-            const rangeList = command.getKeywordRangeList(keyword)
-
-            if (Array.isArray(rangeList) && rangeList.length > 0) {
-              rangeList.forEach((range: any) => {
-                try {
-                  range.startIndex -= 1
-                  command.executeReplaceRange(range)
-                  const groupId = command.executeSetGroup()
-
-                  if (groupId) {
-                    createComment({
-                      groupId,
-                      content: item.风险提示,
-                      additionalContent: item.修改建议,
-                      riskLevel: item.风险等级 as '高' | '中' | '低',
-                      userName: 'System',
-                      rangeText: keyword,
-                      autoExpand: false,
-                    })
-                  }
-                } catch (error) {
-                  console.error('Error processing range:', error)
-                }
-              })
-            }
+        while (!isValidResponse && retryCount < MAX_RETRIES) {
+          const aiResponse = await fetch('/api/strict-review', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              rule,
+              mainText,
+            }),
           })
-        } catch (parseError) {
-          console.error('JSON解析错误:', parseError)
-          console.error('原始响应:', responseText)
+
+          console.log('API Response status:', aiResponse.status)
+          const responseData = await aiResponse.json()
+          console.log('API Response data:', responseData)
+
+          if (!aiResponse.ok) {
+            throw new Error(
+              responseData.error || 'Strict review request failed'
+            )
+          }
+
+          const { result: responseText } = responseData
+          console.log('AI 原始响应:', responseText)
+
+          try {
+            const cleanedResponseText = responseText
+              .replace(/^```json\s*/, '')
+              .replace(/```$/, '')
+              .trim()
+            const riskData = JSON.parse(cleanedResponseText)
+
+            // 打印解析后的风险数据
+            console.log('解析后的风险数据:', {
+              ruleId: rule.id,
+              riskCount: riskData.length,
+              risks: riskData,
+            })
+
+            // 检查每个风险项
+            for (const item of riskData) {
+              if (item.是否找到风险 === '否') {
+                console.log('未找到风险，跳过当前规则')
+                isValidResponse = true
+                break
+              }
+
+              if (item.是否找到风险 === '是') {
+                if (item.是否符合要求 === '是') {
+                  try {
+                    const keyword = item.原文
+                    // 使用编辑器的命令查找和高亮文本
+                    const command = editor.command as any
+                    const rangeList = command.getKeywordRangeList(keyword)
+
+                    if (Array.isArray(rangeList) && rangeList.length > 0) {
+                      // 找到匹配的文本，创建高亮批注
+                      rangeList.forEach((range: any) => {
+                        try {
+                          range.startIndex -= 1
+                          command.executeReplaceRange(range)
+                          const groupId = command.executeSetGroup()
+
+                          if (groupId) {
+                            createComment({
+                              groupId,
+                              content: `${item.风险提示}${
+                                item.主要增加哪方的风险
+                                  ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                                  : ''
+                              }`,
+                              additionalContent: item.修改建议,
+                              riskLevel: item.风险等级 as '高' | '中' | '低',
+                              userName: 'System',
+                              rangeText: keyword,
+                              autoExpand: false,
+                            })
+                          }
+                        } catch (error) {
+                          console.error(
+                            'Error creating highlight comment:',
+                            error
+                          )
+                        }
+                      })
+                    } else {
+                      // 如果找不到匹配的文本，创建不带高亮的批注
+                      console.warn(`No matches found for keyword: "${keyword}"`)
+                      const manualGroupId = generateUUID()
+                      createComment({
+                        groupId: manualGroupId,
+                        content: `${item.风险提示}${
+                          item.主要增加哪方的风险
+                            ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                            : ''
+                        }`,
+                        additionalContent: item.修改建议,
+                        riskLevel: item.风险等级 as '高' | '中' | '低',
+                        userName: 'System',
+                        rangeText: `原文："${keyword}"（未找到）`,
+                        autoExpand: false,
+                      })
+                    }
+                    isValidResponse = true
+                  } catch (error) {
+                    console.error('Error processing risk item:', error)
+                  }
+                } else {
+                  console.log('审核结果不符合要求，原因:', item.不符合原因)
+                  console.log('重试第', retryCount + 1, '次')
+                  retryCount++
+                  break
+                }
+              }
+            }
+          } catch (parseError) {
+            console.error('JSON解析错误:', {
+              error: parseError,
+              responseText: responseText,
+            })
+            retryCount++
+          }
         }
+
+        if (retryCount >= MAX_RETRIES) {
+          console.warn(`规则 ${rule.category} 达到最大重试次数，跳过`)
+        }
+
+        console.groupEnd()
       }
     } catch (error) {
-      console.error('Error in handleStrictReview:', error)
-      alert('严格审核失败，请稍后重试')
+      console.error('Review error details:', error)
+      alert('审核失败：' + (error.message || '请稍后重试'))
     } finally {
       setIsReviewing(false)
+      setReviewProgress({ current: 0, total: 0 })
     }
   }
 
@@ -757,6 +923,20 @@ export default function CanvasEditor({
               {isReviewing ? '审核中...' : '测试用'}
             </Button>
           </div>
+          {isReviewing && reviewProgress.total > 0 && (
+            <div className="text-sm text-gray-500 mb-2">
+              正在审核 ({reviewProgress.current}/{reviewProgress.total}):
+              {reviewProgress.currentRule}
+              <div className="w-full bg-gray-200 h-2 rounded-full mt-1">
+                <div
+                  className="bg-primary h-full rounded-full transition-all"
+                  style={{
+                    width: `${(reviewProgress.current / reviewProgress.total) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
         <div className="comment-list">
           {commentList.map((comment) => (

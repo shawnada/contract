@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -47,9 +47,17 @@ export default function RuleTable({
   userName: string
   standardTitle: string
 }) {
-  const [data, setData] = useState(rules)
+  const [data, setData] = useState<Rule[]>(rules)
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+
+  // 使用 useEffect 清理数据
+  useEffect(() => {
+    setData(rules)
+    return () => {
+      setData([]) // 组件卸载时清理数据
+    }
+  }, [rules])
 
   // 排序函数
   const sortData = (field: SortField) => {
@@ -174,133 +182,161 @@ export default function RuleTable({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)]">
-      <div className="mb-4 flex items-center justify-between">
-        <Button onClick={addRow}>
-          <Plus className="h-4 w-4 mr-2" />
-          新增规则
-        </Button>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleImport}
-            className="hidden"
-            id="excel-import"
-          />
-          <Button
-            variant="outline"
-            onClick={() => document.getElementById('excel-import')?.click()}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            导入Excel
+    <ErrorBoundary fallback={<div>加载失败，请刷新页面重试</div>}>
+      <div className="flex flex-col h-[calc(100vh-200px)]">
+        <div className="mb-4 flex items-center justify-between">
+          <Button onClick={addRow}>
+            <Plus className="h-4 w-4 mr-2" />
+            新增规则
           </Button>
 
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            导出Excel
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImport}
+              className="hidden"
+              id="excel-import"
+            />
+            <Button
+              variant="outline"
+              onClick={() => document.getElementById('excel-import')?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              导入Excel
+            </Button>
+
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              导出Excel
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[120px] sticky top-0 bg-background">
+                  {renderSortButton('category', '风险分类')}
+                </TableHead>
+                <TableHead className="w-[100px] sticky top-0 bg-background">
+                  {renderSortButton('level', '风险等级')}
+                </TableHead>
+                <TableHead className="w-[400px] sticky top-0 bg-background">
+                  审核原则
+                </TableHead>
+                <TableHead className="sticky top-0 bg-background">
+                  标准条款
+                </TableHead>
+                <TableHead className="w-[100px] sticky top-0 bg-background">
+                  {renderSortButton('submitter', '提交人')}
+                </TableHead>
+                <TableHead className="w-[100px] sticky top-0 bg-background">
+                  操作
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((rule) => (
+                <TableRow key={rule.id}>
+                  <TableCell>
+                    <input
+                      className="w-full border rounded px-2 py-1"
+                      value={rule.category}
+                      onChange={(e) =>
+                        handleChange(rule.id, 'category', e.target.value)
+                      }
+                      placeholder="请输入分类"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={rule.level}
+                      onChange={(e) =>
+                        handleChange(rule.id, 'level', e.target.value)
+                      }
+                    >
+                      <option value="">请选择等级</option>
+                      <option value="高">高</option>
+                      <option value="中">中</option>
+                      <option value="低">低</option>
+                    </select>
+                  </TableCell>
+                  <TableCell>
+                    <textarea
+                      rows={3}
+                      className="w-full border rounded px-2 py-1"
+                      value={rule.principle}
+                      onChange={(e) =>
+                        handleChange(rule.id, 'principle', e.target.value)
+                      }
+                      placeholder="请输入原则"
+                      style={{ resize: 'vertical', minHeight: '80px' }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <input
+                      className="w-full border rounded px-2 py-1"
+                      value={rule.clause}
+                      onChange={(e) =>
+                        handleChange(rule.id, 'clause', e.target.value)
+                      }
+                      placeholder="请输入条款"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <input
+                      className="w-full border rounded px-2 py-1"
+                      value={rule.submitter}
+                      onChange={(e) =>
+                        handleChange(rule.id, 'submitter', e.target.value)
+                      }
+                      placeholder={userName || '请输入提交人'}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(rule.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </div>
-
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[120px] sticky top-0 bg-background">
-                {renderSortButton('category', '风险分类')}
-              </TableHead>
-              <TableHead className="w-[100px] sticky top-0 bg-background">
-                {renderSortButton('level', '风险等级')}
-              </TableHead>
-              <TableHead className="w-[400px] sticky top-0 bg-background">
-                审核原则
-              </TableHead>
-              <TableHead className="sticky top-0 bg-background">
-                标准条款
-              </TableHead>
-              <TableHead className="w-[100px] sticky top-0 bg-background">
-                {renderSortButton('submitter', '提交人')}
-              </TableHead>
-              <TableHead className="w-[100px] sticky top-0 bg-background">
-                操作
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((rule) => (
-              <TableRow key={rule.id}>
-                <TableCell>
-                  <input
-                    className="w-full border rounded px-2 py-1"
-                    value={rule.category}
-                    onChange={(e) =>
-                      handleChange(rule.id, 'category', e.target.value)
-                    }
-                    placeholder="请输入分类"
-                  />
-                </TableCell>
-                <TableCell>
-                  <select
-                    className="w-full border rounded px-2 py-1"
-                    value={rule.level}
-                    onChange={(e) =>
-                      handleChange(rule.id, 'level', e.target.value)
-                    }
-                  >
-                    <option value="">请选择等级</option>
-                    <option value="高">高</option>
-                    <option value="中">中</option>
-                    <option value="低">低</option>
-                  </select>
-                </TableCell>
-                <TableCell>
-                  <textarea
-                    rows={3}
-                    className="w-full border rounded px-2 py-1"
-                    value={rule.principle}
-                    onChange={(e) =>
-                      handleChange(rule.id, 'principle', e.target.value)
-                    }
-                    placeholder="请输入原则"
-                    style={{ resize: 'vertical', minHeight: '80px' }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <input
-                    className="w-full border rounded px-2 py-1"
-                    value={rule.clause}
-                    onChange={(e) =>
-                      handleChange(rule.id, 'clause', e.target.value)
-                    }
-                    placeholder="请输入条款"
-                  />
-                </TableCell>
-                <TableCell>
-                  <input
-                    className="w-full border rounded px-2 py-1"
-                    value={rule.submitter}
-                    onChange={(e) =>
-                      handleChange(rule.id, 'submitter', e.target.value)
-                    }
-                    placeholder={userName || '请输入提交人'}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(rule.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    </ErrorBoundary>
   )
+}
+
+// 错误边界组件
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error in RuleTable:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback
+    }
+    return this.props.children
+  }
 }
