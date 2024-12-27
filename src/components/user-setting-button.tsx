@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getUserInfo } from '@/lib/session'
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getUserInfo } from "@/lib/session";
 import {
   Dialog,
   DialogContent,
@@ -8,13 +8,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { UserProfileForm } from './user-profile-form'
+} from "@/components/ui/dialog";
+import { UserProfileForm } from "./user-profile-form";
 
 export default async function UserSettingButton() {
-  const user = await getUserInfo()
-  if (user == null) return null
-  const { id, name, image, email } = user
+  const user = await getUserInfo();
+  if (user == null) return null;
+  const { id, name, image, email } = user;
 
   return (
     <Dialog>
@@ -29,26 +29,26 @@ export default async function UserSettingButton() {
           <DialogTitle>修改用户信息</DialogTitle>
           <DialogDescription asChild>
             <UserProfileForm
-              name={name || ''}
-              avatar={image || ''}
-              email={email || ''}
+              name={name || ""}
+              avatar={image || ""}
+              email={email || ""}
             />
           </DialogDescription>
         </DialogHeader>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 async function UserAvatar() {
-  const user = await getUserInfo()
-  let { name, image, email } = user || {}
-  if (!name) name = email
+  const user = await getUserInfo();
+  let { name, image, email } = user || {};
+  if (!name) name = email;
 
   return (
     <Avatar className="h-7 w-7 border">
-      <AvatarImage src={image || ''} alt={name || ''} />
+      <AvatarImage src={image || ""} alt={name || ""} />
       <AvatarFallback>{name?.slice(0, 1)}</AvatarFallback>
     </Avatar>
-  )
+  );
 }

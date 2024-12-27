@@ -1,22 +1,22 @@
-'use client'
+"use client";
 
-import { Input } from '@/components/ui/input'
-import { useState } from 'react'
-import debounce from 'lodash.debounce'
-import { updateDoc } from './action'
-import ImportDocButton from './import-doc-button'
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import debounce from "lodash.debounce";
+import { updateDoc } from "./action";
+import ImportDocButton from "./import-doc-button";
 
 const saveTitle = debounce((id: string, title: string) => {
-  updateDoc(id, { title })
-}, 1000)
+  updateDoc(id, { title });
+}, 1000);
 
 export default function Title(props: { id: string; title: string }) {
-  const [title, setTitle] = useState(props.title || '')
+  const [title, setTitle] = useState(props.title || "");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newTitle = e.target.value
-    setTitle(newTitle)
-    saveTitle(props.id, newTitle)
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    saveTitle(props.id, newTitle);
   }
 
   return (
@@ -31,5 +31,5 @@ export default function Title(props: { id: string; title: string }) {
       </div>
       <ImportDocButton id={props.id} />
     </div>
-  )
+  );
 }

@@ -1,29 +1,29 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { updateStandard } from './action'
-import debounce from 'lodash.debounce'
+import { useState } from "react";
+import { updateStandard } from "./action";
+import debounce from "lodash.debounce";
 
 // 防抖保存标题
 const saveTitle = debounce((id: string, title: string) => {
-  updateStandard(id, { title })
-}, 1000)
+  updateStandard(id, { title });
+}, 1000);
 
 export default function Title({
   id,
   title: initialTitle,
 }: {
-  id: string
-  title: string
+  id: string;
+  title: string;
 }) {
-  const [title, setTitle] = useState(initialTitle)
+  const [title, setTitle] = useState(initialTitle);
 
   const handleChange = (value: string) => {
     // 立即更新 UI
-    setTitle(value)
+    setTitle(value);
     // 防抖保存到数据库
-    saveTitle(id, value)
-  }
+    saveTitle(id, value);
+  };
 
   return (
     <div className="mb-8">
@@ -34,5 +34,5 @@ export default function Title({
         placeholder="未命名标准"
       />
     </div>
-  )
+  );
 }

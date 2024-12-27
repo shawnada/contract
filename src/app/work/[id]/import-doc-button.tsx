@@ -1,93 +1,93 @@
-'use client'
+"use client";
 
-import { Button } from '@/components/ui/button'
-import { FileUp } from 'lucide-react'
-import { useState } from 'react'
-import { updateDoc } from './action'
-import { useEditorContext } from './editor-context'
+import { Button } from "@/components/ui/button";
+import { FileUp } from "lucide-react";
+import { useState } from "react";
+import { updateDoc } from "./action";
+import { useEditorContext } from "./editor-context";
 
 export default function ImportDocButton({ id }: { id: string }) {
-  const [isLoading, setIsLoading] = useState(false)
-  const { editorRef } = useEditorContext()
+  const [isLoading, setIsLoading] = useState(false);
+  const { editorRef } = useEditorContext();
 
-  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      alert('文件过大，请选择小于10MB的文件')
-      return
+      alert("文件过大，请选择小于10MB的文件");
+      return;
     }
 
     try {
-      setIsLoading(true)
-      console.log('开始导入文件:', file.name)
+      setIsLoading(true);
+      console.log("开始导入文件:", file.name);
 
-      const formData = new FormData()
-      formData.append('file', file)
+      const formData = new FormData();
+      formData.append("file", file);
 
-      console.log('准备发送请求到转换接口...')
+      console.log("准备发送请求到转换接口...");
 
-      const response = await fetch('/api/convert-doc', {
-        method: 'POST',
+      const response = await fetch("/api/convert-doc", {
+        method: "POST",
         body: formData,
-      })
+      });
 
-      console.log('接口响应状态:', response.status)
+      console.log("接口响应状态:", response.status);
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('接口返回错误:', errorData)
-        throw new Error(errorData.error || '转换失败')
+        const errorData = await response.json();
+        console.error("接口返回错误:", errorData);
+        throw new Error(errorData.error || "转换失败");
       }
 
       // 获取转换后的HTML内容
-      const htmlContent = await response.text()
-      console.log('成功获取转换后的HTML内容，长度:', htmlContent.length)
+      const htmlContent = await response.text();
+      console.log("成功获取转换后的HTML内容，长度:", htmlContent.length);
 
       // 使用 canvas-editor 的 API 插入 HTML
       if (editorRef.current?.command) {
-        console.log('Editor instance found:', editorRef.current)
+        console.log("Editor instance found:", editorRef.current);
         try {
           editorRef.current.command.executeSetHTML({
-            header: '',
+            header: "",
             main: htmlContent,
-            footer: '',
-          })
-          console.log('HTML content set successfully')
+            footer: "",
+          });
+          console.log("HTML content set successfully");
 
           // 保存到数据库
           await updateDoc(id, {
             content: JSON.stringify({
-              header: [{ value: '', size: 15 }],
+              header: [{ value: "", size: 15 }],
               main: [{ value: htmlContent, size: 16 }],
-              footer: [{ value: '', size: 12 }],
+              footer: [{ value: "", size: 12 }],
             }),
-          })
+          });
 
-          console.log('文档更新成功')
+          console.log("文档更新成功");
         } catch (error) {
-          console.error('Error setting HTML content:', error)
-          throw error
+          console.error("Error setting HTML content:", error);
+          throw error;
         }
       } else {
-        console.error('Editor instance details:', {
+        console.error("Editor instance details:", {
           editorRef: editorRef,
           current: editorRef.current,
           hasCommand: editorRef.current?.command,
-        })
-        throw new Error('编辑器实例未找到')
+        });
+        throw new Error("编辑器实例未找到");
       }
     } catch (error) {
-      console.error('导入文档失败，详细错误:', error)
-      alert('导入文档失败，请确保文件格式正确并重试')
+      console.error("导入文档失败，详细错误:", error);
+      alert("导入文档失败，请确保文件格式正确并重试");
     } finally {
-      setIsLoading(false)
-      e.target.value = ''
+      setIsLoading(false);
+      e.target.value = "";
     }
-  }
+  };
 
   return (
     <div>
@@ -107,10 +107,10 @@ export default function ImportDocButton({ id }: { id: string }) {
         >
           <span>
             <FileUp className="h-4 w-4 mr-2" />
-            {isLoading ? '导入中...' : '导入文档'}
+            {isLoading ? "导入中..." : "导入文档"}
           </span>
         </Button>
       </label>
     </div>
-  )
+  );
 }

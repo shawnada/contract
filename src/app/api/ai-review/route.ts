@@ -1,19 +1,19 @@
-import { NextRequest } from 'next/server'
-import OpenAI from 'openai'
-import { getUserInfo } from '@/lib/session'
+import { NextRequest } from "next/server";
+import OpenAI from "openai";
+import { getUserInfo } from "@/lib/session";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUserInfo()
+    const user = await getUserInfo();
     if (!user?.id) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { rules, mainText } = await request.json()
+    const { rules, mainText } = await request.json();
 
     // 第一步：获取初始审核结果
     const initialPrompt = `你是"重庆中联信息产业有限责任公司"的律师，这是一家医疗软件公司，请按照《审核标准》进行审核，内容如下：
@@ -42,14 +42,14 @@ export async function POST(request: NextRequest) {
       }
     ]
     请严格按照这个JSON格式返回，不要添加其他内容，确保可以被 JSON.parse() 正确解析。
-    `
+    `;
 
     const initialCompletion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'system', content: initialPrompt }],
-    })
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: initialPrompt }],
+    });
 
-    const initialResponse = initialCompletion.choices[0].message.content
+    const initialResponse = initialCompletion.choices[0].message.content;
 
     // 第二步：验证和过滤结果
     const verificationPrompt = `作为审核员，请检查AI返回的审核结果是否严格符合规则要求。
@@ -79,22 +79,22 @@ export async function POST(request: NextRequest) {
       }
     ]
     
-    只返回过滤后的JSON数组，不要包含任何其他解释或评论。`
+    只返回过滤后的JSON数组，不要包含任何其他解释或评论。`;
 
     const verificationCompletion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'system', content: verificationPrompt }],
-    })
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: verificationPrompt }],
+    });
 
     const verificationResponse =
-      verificationCompletion.choices[0].message.content
+      verificationCompletion.choices[0].message.content;
 
-    return Response.json({ result: verificationResponse })
+    return Response.json({ result: verificationResponse });
   } catch (error) {
-    console.error('AI Review Error:', error)
+    console.error("AI Review Error:", error);
     return Response.json(
-      { error: 'Failed to process AI review' },
-      { status: 500 }
-    )
+      { error: "Failed to process AI review" },
+      { status: 500 },
+    );
   }
 }

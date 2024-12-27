@@ -1,10 +1,10 @@
-'use client'
+"use client";
 
-import { useRouter, useParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Plus, Trash2 } from 'lucide-react'
-import { createStandard, deleteStandard } from './[id]/action'
+import { useRouter, useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Trash2 } from "lucide-react";
+import { createStandard, deleteStandard } from "./[id]/action";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,38 +15,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+} from "@/components/ui/alert-dialog";
 
 interface Standard {
-  id: string
-  title: string
-  updatedAt: Date
+  id: string;
+  title: string;
+  updatedAt: Date;
   user: {
-    name: string | null
-  }
+    name: string | null;
+  };
 }
 
 export default function StandardList({ standards }: { standards: Standard[] }) {
-  const router = useRouter()
-  const params = useParams()
-  const currentId = params.id as string
+  const router = useRouter();
+  const params = useParams();
+  const currentId = params.id as string;
 
   const handleCreate = async () => {
-    const standard = await createStandard()
-    router.push(`/rules/${standard.id}`)
-  }
+    const standard = await createStandard();
+    router.push(`/rules/${standard.id}`);
+  };
 
   const handleDelete = async (standardId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const result = await deleteStandard(standardId)
+    e.stopPropagation();
+    const result = await deleteStandard(standardId);
     if (result.success) {
       if (standardId === currentId) {
-        router.push('/rules')
+        router.push("/rules");
       }
     } else {
-      alert(result.error || '删除失败')
+      alert(result.error || "删除失败");
     }
-  }
+  };
 
   return (
     <div className="w-60 border-r flex flex-col">
@@ -62,7 +62,7 @@ export default function StandardList({ standards }: { standards: Standard[] }) {
             <div
               key={standard.id}
               className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                currentId === standard.id ? 'bg-gray-100' : ''
+                currentId === standard.id ? "bg-gray-100" : ""
               } group flex justify-between items-start`}
               onClick={() => router.push(`/rules/${standard.id}`)}
             >
@@ -73,7 +73,7 @@ export default function StandardList({ standards }: { standards: Standard[] }) {
                     更新时间：{new Date(standard.updatedAt).toLocaleString()}
                   </div>
                   <div className="text-gray-500">
-                    创建人：{standard.user?.name || '未知'}
+                    创建人：{standard.user?.name || "未知"}
                   </div>
                 </div>
               </div>
@@ -113,5 +113,5 @@ export default function StandardList({ standards }: { standards: Standard[] }) {
         </div>
       </ScrollArea>
     </div>
-  )
+  );
 }

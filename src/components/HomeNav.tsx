@@ -1,7 +1,7 @@
-import Logo from './Logo'
-import { Button } from './ui/button'
-import { Github } from 'lucide-react'
-import ChangeTheme from './ChangeTheme'
+import Logo from "./Logo";
+import { Button } from "./ui/button";
+import { Github } from "lucide-react";
+import ChangeTheme from "./ChangeTheme";
 
 export default function HomeNav() {
   return (
@@ -18,5 +18,5 @@ export default function HomeNav() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,23 +1,23 @@
-import { db } from '@/db/db'
-import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { getUserInfo } from '@/lib/session'
+import { db } from "@/db/db";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getUserInfo } from "@/lib/session";
 
 export default async function Work() {
-  let pathname = '/work/0'
+  let pathname = "/work/0";
 
-  const user = await getUserInfo()
+  const user = await getUserInfo();
   if (user && user.id) {
     const firstDoc = await db.doc.findFirst({
       where: { userId: user.id },
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
-    })
-    if (firstDoc != null) pathname = `/work/${firstDoc?.id}` // 找到第一篇文档，然后跳转过去
+    });
+    if (firstDoc != null) pathname = `/work/${firstDoc?.id}`; // 找到第一篇文档，然后跳转过去
   }
 
-  redirect(pathname)
+  redirect(pathname);
 
   return (
     <Wrapper>
@@ -25,9 +25,9 @@ export default async function Work() {
         跳转到 {pathname}
       </Link>
     </Wrapper>
-  )
+  );
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
-  return <div>{children}</div>
+  return <div>{children}</div>;
 }

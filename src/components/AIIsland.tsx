@@ -1,6 +1,6 @@
-import { Sparkles, CornerDownLeft, MoveUpRight } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { Sparkles, CornerDownLeft, MoveUpRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function AIIsland() {
   return (
@@ -56,5 +56,5 @@ export default function AIIsland() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

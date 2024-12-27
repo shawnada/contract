@@ -1,27 +1,27 @@
-import { getStandard } from './action'
-import Title from './title'
-import RuleTable from './rule-table'
-import { redirect } from 'next/navigation'
-import { getUserInfo } from '@/lib/session'
+import { getStandard } from "./action";
+import Title from "./title";
+import RuleTable from "./rule-table";
+import { redirect } from "next/navigation";
+import { getUserInfo } from "@/lib/session";
 
 export default async function StandardPage({
   params,
 }: {
-  params: { id: string }
+  params: { id: string };
 }) {
   try {
     // 检查用户登录状态
-    const user = await getUserInfo()
+    const user = await getUserInfo();
     if (!user || !user.id) {
-      redirect('/login')
+      redirect("/login");
     }
 
     // 获取标准
-    const standard = await getStandard(params.id)
+    const standard = await getStandard(params.id);
 
     // 如果标准不存在，重定向到 rules 首页
     if (!standard) {
-      redirect('/rules')
+      redirect("/rules");
     }
 
     return (
@@ -32,15 +32,15 @@ export default async function StandardPage({
             key={params.id}
             rules={standard.rules}
             standardId={params.id}
-            userName={user.name || ''}
+            userName={user.name || ""}
             standardTitle={standard.title}
           />
         </div>
       </div>
-    )
+    );
   } catch (error) {
-    console.error('Error in StandardPage:', error)
+    console.error("Error in StandardPage:", error);
     // 出错时重定向到 rules 首页
-    redirect('/rules')
+    redirect("/rules");
   }
 }

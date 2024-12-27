@@ -2,26 +2,26 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import WorkNav from '@/components/WorkNav'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Home, Book, LogOut, Trash2, Users } from 'lucide-react'
-import UserSettingButton from '@/components/user-setting-button'
-import SignOutButton from '@/components/sign-out-button'
-import Link from 'next/link'
+} from "@/components/ui/resizable";
+import WorkNav from "@/components/WorkNav";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Home, Book, LogOut, Trash2, Users } from "lucide-react";
+import UserSettingButton from "@/components/user-setting-button";
+import SignOutButton from "@/components/sign-out-button";
+import Link from "next/link";
 
 export default function Layout({
   params,
   children,
   directory, // parallel route
 }: Readonly<{
-  params: { id: string }
-  children: React.ReactNode
-  directory: React.ReactNode
+  params: { id: string };
+  children: React.ReactNode;
+  directory: React.ReactNode;
 }>) {
-  const { id = '0' } = params
+  const { id = "0" } = params;
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-screen">
@@ -78,5 +78,5 @@ export default function Layout({
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
-  )
+  );
 }

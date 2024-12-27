@@ -1,38 +1,38 @@
-import { NextRequest } from 'next/server'
-import OpenAI from 'openai'
-import { getUserInfo } from '@/lib/session'
+import { NextRequest } from "next/server";
+import OpenAI from "openai";
+import { getUserInfo } from "@/lib/session";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUserInfo()
+    const user = await getUserInfo();
     if (!user?.id) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 打印请求体
-    const body = await request.json()
+    const body = await request.json();
     // console.log('Request body:', body)
 
-    const { rule, mainText } = body
+    const { rule, mainText } = body;
 
     if (!rule || !mainText) {
       return Response.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
     }
 
     // 检查 OpenAI 配置
     if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API key not configured')
+      console.error("OpenAI API key not configured");
       return Response.json(
-        { error: 'OpenAI configuration missing' },
-        { status: 500 }
-      )
+        { error: "OpenAI configuration missing" },
+        { status: 500 },
+      );
     }
 
     try {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       - 类别: ${rule.category}
       - 风险等级: ${rule.level}
       - 审核原则: ${rule.principle}
-      ${rule.clause ? `- 相关条款: ${rule.clause}` : ''}
+      ${rule.clause ? `- 相关条款: ${rule.clause}` : ""}
 
 
 
@@ -71,20 +71,20 @@ export async function POST(request: NextRequest) {
       合同全文内容：
       ${mainText}
       
-      `
+      `;
 
       // 打印完整提示词
       // console.log('Prompt:', initialPrompt)
-      console.log('----------------------------------------')
+      console.log("----------------------------------------");
 
       const initialCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: initialPrompt }],
-      })
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: initialPrompt }],
+      });
 
-      const initialResponse = initialCompletion.choices[0].message.content
+      const initialResponse = initialCompletion.choices[0].message.content;
 
-      console.log('AI律师回答:', initialResponse)
+      console.log("AI律师回答:", initialResponse);
 
       // 第二步：验证和过滤结果
       const verificationPrompt = `
@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         }
       ]
       2.是否除了json，没有返回任何其他任何多余内容
+      3.json中，如果“风险等级”的值为空，是符合规则的，并未要求必须填写
       3.AI律师返回结果：
       ${initialResponse}
       4.你返回的结果应当在AI律师返回结果的基础上，增加“是否符合要求”和“不符合原因”两个字段
@@ -119,34 +120,34 @@ export async function POST(request: NextRequest) {
         }
       ]
 
-      `
+      `;
 
       // 打印验证提示词
       // console.log('Verification Prompt:', verificationPrompt)
-      console.log('----------------------------------------')
+      console.log("----------------------------------------");
 
       const verificationCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: verificationPrompt }],
-      })
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: verificationPrompt }],
+      });
 
       const verificationResponse =
-        verificationCompletion.choices[0].message.content
-      console.log('复查员返回结果:', verificationResponse)
+        verificationCompletion.choices[0].message.content;
+      console.log("复查员返回结果:", verificationResponse);
 
-      return Response.json({ result: verificationResponse })
+      return Response.json({ result: verificationResponse });
     } catch (openaiError) {
-      console.error('OpenAI API error:', openaiError)
+      console.error("OpenAI API error:", openaiError);
       return Response.json(
-        { error: 'AI service error', details: openaiError.message },
-        { status: 500 }
-      )
+        { error: "AI service error", details: openaiError.message },
+        { status: 500 },
+      );
     }
   } catch (error) {
-    console.error('API route error:', error)
+    console.error("API route error:", error);
     return Response.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    )
+      { error: "Internal server error", details: error.message },
+      { status: 500 },
+    );
   }
 }

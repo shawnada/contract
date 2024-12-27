@@ -1,9 +1,9 @@
 // import Image from "next/image";
-import { Button } from '@/components/ui/button'
-import { Code } from 'lucide-react'
-import HomeNav from '@/components/HomeNav'
-import Slogan from '@/components/Slogan'
-import StartButton from './start-button'
+import { Button } from "@/components/ui/button";
+import { Code } from "lucide-react";
+import HomeNav from "@/components/HomeNav";
+import Slogan from "@/components/Slogan";
+import StartButton from "./start-button";
 
 export default async function Home() {
   return (
@@ -17,5 +17,5 @@ export default async function Home() {
         <StartButton />
       </section>
     </main>
-  )
+  );
 }

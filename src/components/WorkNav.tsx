@@ -1,15 +1,15 @@
-import Logo from './Logo'
-import ChangeTheme from './ChangeTheme'
-import { Button } from './ui/button'
-import { Forward, Star } from 'lucide-react'
-import Link from 'next/link'
+import Logo from "./Logo";
+import ChangeTheme from "./ChangeTheme";
+import { Button } from "./ui/button";
+import { Forward, Star } from "lucide-react";
+import Link from "next/link";
 
 interface IProps {
-  workId?: string
+  workId?: string;
 }
 
 export default function WorkNav(props: IProps) {
-  const { workId } = props
+  const { workId } = props;
 
   return (
     <div className="h-[46px] flex text-secondary-foreground my-1 mx-3 bg-ground pb-1 border-b">
@@ -33,5 +33,5 @@ export default function WorkNav(props: IProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

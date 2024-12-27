@@ -1,22 +1,22 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { ThemeProvider } from '@/components/theme-provider'
-import { isMobileDevice } from '@/lib/isMobileDevice'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { isMobileDevice } from "@/lib/isMobileDevice";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '文本审核系统',
-  description: '审核系统',
-}
+  title: "文本审核系统",
+  description: "审核系统",
+};
 
 export default async function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
-  const isMobile = await isMobileDevice()
+  const isMobile = await isMobileDevice();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -40,5 +40,5 @@ export default async function RootLayout({
         )}
       </body>
     </html>
-  )
+  );
 }

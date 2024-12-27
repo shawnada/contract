@@ -1,5 +1,5 @@
-import { signOut } from 'auth'
-import { Button } from '@/components/ui/button'
+import { signOut } from "auth";
+import { Button } from "@/components/ui/button";
 
 export default function SignOutButton({
   children,
@@ -7,23 +7,23 @@ export default function SignOutButton({
   size,
   variant,
 }: {
-  children: React.ReactNode
-  className?: string
-  size?: 'sm' | 'lg'
+  children: React.ReactNode;
+  className?: string;
+  size?: "sm" | "lg";
   variant?:
-    | 'secondary'
-    | 'ghost'
-    | 'link'
-    | 'default'
-    | 'destructive'
-    | 'outline'
-    | null
+    | "secondary"
+    | "ghost"
+    | "link"
+    | "default"
+    | "destructive"
+    | "outline"
+    | null;
 }) {
   return (
     <form
       action={async () => {
-        'use server'
-        await signOut()
+        "use server";
+        await signOut();
       }}
       className="w-full"
     >
@@ -31,5 +31,5 @@ export default function SignOutButton({
         {children}
       </Button>
     </form>
-  )
+  );
 }

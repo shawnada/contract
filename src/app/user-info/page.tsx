@@ -1,10 +1,10 @@
-import Link from 'next/link'
-import HomeNav from '@/components/HomeNav'
-import SignOutButton from '@/components/sign-out-button'
-import { getUserInfo } from '@/lib/session'
+import Link from "next/link";
+import HomeNav from "@/components/HomeNav";
+import SignOutButton from "@/components/sign-out-button";
+import { getUserInfo } from "@/lib/session";
 
 export default async function UserTestPage() {
-  const user = await getUserInfo()
+  const user = await getUserInfo();
 
   if (user == null)
     return (
@@ -14,7 +14,7 @@ export default async function UserTestPage() {
           请到首页登录
         </Link>
       </Wrapper>
-    )
+    );
 
   return (
     <Wrapper>
@@ -24,7 +24,7 @@ export default async function UserTestPage() {
         <SignOutButton>退出</SignOutButton>
       </div>
     </Wrapper>
-  )
+  );
 }
 
 // 容器
@@ -34,5 +34,5 @@ function Wrapper({ children }: { children: React.ReactNode }) {
       <HomeNav />
       {children}
     </div>
-  )
+  );
 }

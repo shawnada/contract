@@ -1,7 +1,7 @@
-'use server'
+"use server";
 
-import { db } from '@/db/db'
-import { getUserInfo } from '@/lib/session'
+import { db } from "@/db/db";
+import { getUserInfo } from "@/lib/session";
 
 export async function getStandards() {
   try {
@@ -16,12 +16,12 @@ export async function getStandards() {
         },
       },
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
-    })
-    return standards
+    });
+    return standards;
   } catch (error) {
-    console.error('Error fetching standards:', error)
-    return []
+    console.error("Error fetching standards:", error);
+    return [];
   }
 }

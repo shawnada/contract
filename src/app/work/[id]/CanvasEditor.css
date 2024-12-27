@@ -65,32 +65,32 @@
   background-color: #f5f7fa;
 }
 
-/* 根据风险等级设置不同的边框和背景色 */
-.comment-item[data-risk='高'] {
+/* 根据风险等级�����置不同的边框和背景色 */
+.comment-item[data-risk="高"] {
   border-left-color: #dc2626;
   background-color: rgba(254, 202, 202, 0.1);
 }
 
-.comment-item[data-risk='中'] {
+.comment-item[data-risk="中"] {
   border-left-color: #d97706;
   background-color: rgba(254, 243, 199, 0.1);
 }
 
-.comment-item[data-risk='低'] {
+.comment-item[data-risk="低"] {
   border-left-color: #4b5563;
   background-color: rgba(229, 231, 235, 0.1);
 }
 
 /* 激活状态加深背景色 */
-.comment-item[data-risk='高'].active {
+.comment-item[data-risk="高"].active {
   background-color: rgba(254, 202, 202, 0.2);
 }
 
-.comment-item[data-risk='中'].active {
+.comment-item[data-risk="中"].active {
   background-color: rgba(254, 243, 199, 0.2);
 }
 
-.comment-item[data-risk='低'].active {
+.comment-item[data-risk="低"].active {
   background-color: rgba(229, 231, 235, 0.2);
 }
 
@@ -247,4 +247,75 @@
 
 .comment-header .flex > * {
   min-height: 40px;
+}
+
+.comment-header .log-container {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  height: 128px;
+  overflow-y: auto;
+  font-size: 0.875rem;
+}
+
+.log-entry {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.log-entry .timestamp {
+  color: #9ca3af;
+  margin-right: 8px;
+}
+
+.log-entry.error {
+  color: #dc2626;
+}
+
+.log-entry.warn {
+  color: #d97706;
+}
+
+.log-entry.info {
+  color: #4b5563;
+}
+
+/* 自定义滚动条样式 */
+.log-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.log-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 2px;
+}
+
+.log-container::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.log-container::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 添加进度条容器样式 */
+.progress-container {
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* 添加进度条动画 */
+.progress-bar {
+  transition: width 0.3s ease;
+}
+
+/* 添加空状态样式 */
+.empty-state {
+  color: #9ca3af;
+  text-align: center;
+  padding: 1rem;
+  font-style: italic;
 }
