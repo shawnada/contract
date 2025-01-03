@@ -20,7 +20,8 @@ export default function OnlyOfficeEditor({
   useEffect(() => {
     async function initEditor() {
       if (typeof (window as any).DocsAPI === "undefined") {
-        console.warn("OnlyOffice API not loaded");
+        console.warn("Waiting for OnlyOffice API to load...");
+        setTimeout(initEditor, 1000);
         return;
       }
 
@@ -49,12 +50,20 @@ export default function OnlyOfficeEditor({
         }
 
         if (documentUrl) {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+          if (!baseUrl) {
+            throw new Error("NEXT_PUBLIC_APP_URL is not configured");
+          }
+
           const config = {
             document: {
               fileType: "docx",
               key: `${id}_${latestVersion}`,
               title: "Document.docx",
-              url: `${window.location.origin}${documentUrl}`,
+              url: documentUrl.startsWith("http")
+                ? documentUrl
+                : `${baseUrl}${documentUrl}`,
               permissions: {
                 download: true,
                 edit: true,
@@ -69,7 +78,7 @@ export default function OnlyOfficeEditor({
             },
             documentType: "word",
             editorConfig: {
-              callbackUrl: `${window.location.origin}/api/callback?docId=${id}`,
+              callbackUrl: `${baseUrl}/api/callback?docId=${id}`,
               lang: "zh-CN",
               mode: "edit",
               user: {
@@ -95,6 +104,9 @@ export default function OnlyOfficeEditor({
               },
             },
             events: {
+              onAppReady: () => {
+                console.log("OnlyOffice editor is ready");
+              },
               onDocumentStateChange: async (event: any) => {
                 console.log("Document state changed:", event);
                 if (event.type === "save") {
@@ -106,26 +118,6 @@ export default function OnlyOfficeEditor({
               },
               onError: (event: any) => {
                 console.error("OnlyOffice error:", event);
-              },
-              onRequestClose: () => {
-                console.log("Document closed");
-              },
-              onSave: async () => {
-                console.log("Document saved");
-              },
-              onRequestSaveAs: (event: any) => {
-                console.log("Save as requested:", event);
-                return true;
-              },
-              onRequestInsertImage: (event: any) => {
-                console.log("Insert image requested:", event);
-                return true;
-              },
-              onRequestCompareFile: () => {
-                return true;
-              },
-              onRequestHistory: () => {
-                return true;
               },
             },
             height: "100%",
@@ -146,22 +138,6 @@ export default function OnlyOfficeEditor({
           );
 
           editorRef.current = editor;
-
-          const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (editor && editor.editorIsModified) {
-              e.preventDefault();
-              e.returnValue = "";
-            }
-          };
-
-          window.addEventListener("beforeunload", handleBeforeUnload);
-
-          return () => {
-            window.removeEventListener("beforeunload", handleBeforeUnload);
-            if (editorRef.current) {
-              editorRef.current.destroyEditor();
-            }
-          };
         }
       } catch (error) {
         console.error("Error initializing editor:", error);
@@ -169,6 +145,12 @@ export default function OnlyOfficeEditor({
     }
 
     initEditor();
+
+    return () => {
+      if (editorRef.current) {
+        editorRef.current.destroyEditor();
+      }
+    };
   }, [id, content, version]);
 
   return <div id="onlyoffice-editor" className="h-full w-full" />;
