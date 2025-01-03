@@ -1,35 +1,16 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import debounce from "lodash.debounce";
-import { updateDoc } from "./action";
-import ImportDocButton from "./import-doc-button";
+import { DeleteButton } from "@/components/doc-operations";
+import { ImportDocButton } from "@/components/import-doc-button";
 
-const saveTitle = debounce((id: string, title: string) => {
-  updateDoc(id, { title });
-}, 1000);
-
-export default function Title(props: { id: string; title: string }) {
-  const [title, setTitle] = useState(props.title || "");
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newTitle = e.target.value;
-    setTitle(newTitle);
-    saveTitle(props.id, newTitle);
-  }
-
+export default function Title({ id, title }: { id: string; title: string }) {
   return (
-    <div className="mb-8 flex items-center gap-4">
-      <div className="max-w-[200px] ml-40">
-        <Input
-          placeholder="请输入标题..."
-          value={title}
-          onChange={handleChange}
-          className="border-none p-0 text-xl font-bold focus-visible:ring-transparent"
-        />
+    <div className="flex items-center justify-between px-4 py-2 border-b">
+      <h1 className="text-xl font-semibold">{title}</h1>
+      <div className="flex items-center gap-2">
+        <ImportDocButton id={id} />
+        <DeleteButton id={id} />
       </div>
-      <ImportDocButton id={props.id} />
     </div>
   );
 }

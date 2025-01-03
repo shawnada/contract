@@ -15,7 +15,6 @@ export function DeleteButton({ id }: { id: string }) {
 
     try {
       await deleteDoc(id);
-      router.push("/");
       router.refresh();
     } catch (error) {
       console.error("Error deleting document:", error);

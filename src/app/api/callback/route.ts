@@ -15,6 +15,23 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     console.log("Callback data:", data);
 
+    // 处理文件转换回调
+    if (data.type === "convert") {
+      const docId = data.docId;
+      const fileUrl = data.url;
+
+      // 更新数据库中的文档内容
+      await prisma.doc.update({
+        where: { id: docId },
+        data: {
+          content: fileUrl,
+          version: { increment: 1 },
+        },
+      });
+
+      return Response.json({ success: true });
+    }
+
     // 从URL参数获取文档ID
     const searchParams = req.nextUrl.searchParams;
     const docId = searchParams.get("docId");
