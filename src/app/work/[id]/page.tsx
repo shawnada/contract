@@ -1,13 +1,11 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getDoc } from "./action";
 import Title from "./title";
-import Content from "./content";
-import CanvasContent from "./canvas-content";
+import OnlyOfficeEditor from "./onlyoffice-editor";
 import { EditorProvider } from "./editor-context";
 
-export default async function OneWork({ params }: { params: { id: string } }) {
+export default async function WorkPage({ params }: { params: { id: string } }) {
   const id = params.id;
-
   const doc = await getDoc(id);
 
   if (doc == null)
@@ -19,14 +17,18 @@ export default async function OneWork({ params }: { params: { id: string } }) {
 
   return (
     <EditorProvider>
-      <ScrollArea className="h-[calc(100vh-46px)]">
-        <div className="max-w-[900px] ml-10 my-4">
+      <div className="flex flex-col h-full">
+        <div className="flex-none">
           <Title id={id} title={doc.title} />
-          <div className="mt-4">
-            <CanvasContent id={id} content={doc.content} />
-          </div>
         </div>
-      </ScrollArea>
+        <div className="flex-1 overflow-hidden">
+          <OnlyOfficeEditor
+            id={id}
+            content={doc.content}
+            version={doc.version}
+          />
+        </div>
+      </div>
     </EditorProvider>
   );
 }

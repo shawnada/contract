@@ -15,7 +15,7 @@ import Link from "next/link";
 export default function Layout({
   params,
   children,
-  directory, // parallel route
+  directory,
 }: Readonly<{
   params: { id: string };
   children: React.ReactNode;
@@ -24,9 +24,9 @@ export default function Layout({
   const { id = "0" } = params;
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-screen">
+    <ResizablePanelGroup direction="horizontal" className="min-h-screen">
       <ResizablePanel defaultSize={15}>
-        <div className="flex flex-col h-screen bg-muted text-muted-foreground p-2">
+        <div className="flex flex-col h-full bg-muted text-muted-foreground p-2">
           <div>
             <UserSettingButton />
             <Link href="/" className="w-full">
@@ -71,7 +71,7 @@ export default function Layout({
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={85}>
-        <div className="h-screen flex flex-col relative">
+        <div className="h-full flex flex-col">
           {/* <WorkNav workId={id} /> */}
 
           <div className="flex-1">{children}</div>

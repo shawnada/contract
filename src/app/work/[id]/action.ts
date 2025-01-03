@@ -1,51 +1,100 @@
 "use server";
 
+import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { db } from "@/db/db";
-import { getUserInfo } from "@/lib/session";
+import { unlink } from "fs/promises";
+import { join } from "path";
+
+const BASE_STORAGE_PATH = process.env.STORAGE_PATH;
+
+export async function updateDoc(
+  id: string,
+  data: { content?: string; title?: string; version?: number },
+) {
+  try {
+    // 如果要更新版本，先获取当前版本
+    if (data.version) {
+      const currentDoc = await prisma.doc.findUnique({
+        where: { id },
+        select: { version: true },
+      });
+
+      // 只有当新版本大于当前版本时才更新
+      if (currentDoc && data.version <= currentDoc.version) {
+        console.log(
+          "Version not updated - new version is not greater than current",
+        );
+        return currentDoc;
+      }
+    }
+
+    const result = await prisma.doc.update({
+      where: { id },
+      data,
+    });
+
+    // 重新验证所有相关路径
+    revalidatePath(`/work/${id}`);
+    revalidatePath("/");
+    revalidatePath(`/api/documents/${result.userId}/${result.fileKey}`);
+
+    return result;
+  } catch (error) {
+    console.error("Error updating document:", error);
+    throw error;
+  }
+}
 
 export async function getDoc(id: string) {
-  const user = await getUserInfo();
-  if (!user || !user.id) return null;
-
   try {
-    const doc = await db.doc.findUnique({
-      where: { id, userId: user.id },
+    return await prisma.doc.findUnique({
+      where: { id },
     });
-    return doc;
-  } catch (ex) {
+  } catch (error) {
+    console.error("Error fetching document:", error);
     return null;
   }
 }
 
-export async function updateDoc(
-  id: string,
-  data: { title?: string; content?: string },
-) {
-  const user = await getUserInfo();
-  if (!user || !user.id) return null;
-
+export async function deleteDoc(id: string) {
   try {
-    console.log("尝试更新文档:", {
-      id,
-      userId: user.id,
-      contentType: typeof data.content,
-      contentLength: data.content ? data.content.length : 0,
+    // 获取文档信息
+    const doc = await prisma.doc.findUnique({
+      where: { id },
+      select: { userId: true, fileKey: true },
     });
 
-    const result = await db.doc.update({
-      where: { id, userId: user.id },
-      data,
+    if (!doc) {
+      throw new Error("Document not found");
+    }
+
+    // 如果有文件，删除物理文件
+    if (doc.fileKey) {
+      const filePath = join(
+        BASE_STORAGE_PATH!,
+        doc.userId,
+        `${doc.fileKey}.docx`,
+      );
+      try {
+        await unlink(filePath);
+        console.log("Physical file deleted:", filePath);
+      } catch (error) {
+        console.error("Error deleting physical file:", error);
+        // 继续执行，即使文件删除失败
+      }
+    }
+
+    // 删除数据库记录
+    await prisma.doc.delete({
+      where: { id },
     });
 
-    console.log("文档更新成功");
+    // 重新验证路径
+    revalidatePath("/");
 
-    // 重新验证路径，清空缓存
-    revalidatePath(`/work/${id}`);
-
-    return result;
-  } catch (ex) {
-    console.error("更新文档失败:", ex);
-    throw ex;
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    throw error;
   }
 }

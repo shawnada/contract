@@ -20,6 +20,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="text/javascript"
+          src="http://192.168.73.73:8888/web-apps/apps/api/documents/api.js"
+          async
+        />
+      </head>
       <body className={inter.className}>
         {isMobile && (
           <div className="h-screen flex flex-col items-center justify-center">

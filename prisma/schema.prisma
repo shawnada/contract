@@ -16,34 +16,40 @@ datasource db {
 
 // 数据模型
 model Doc {
-    id        String  @id @default(cuid())
+    id        String   @id @default(cuid())
     title     String
-    content   Json    @default("{}")    // 明确指定为 Json 类型
+    content   String?  // 存储文档的URL路径
+    fileKey   String?  // 存储OnlyOffice文档的key
+    version   Int      @default(1) // 添加版本字段
+    status    String   @default("active") // 文档状态：active, archived, deleted
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    comments  Comment[]
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
-    user    User     @relation(fields: [userId], references: [id])
-    userId  String
-    comments  Comment[]
+
+    @@index([userId])
+    @@index([fileKey])
 }
 
 // NextAuth Adapter models
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -52,6 +58,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model User {
@@ -63,7 +71,10 @@ model User {
   accounts      Account[]
   sessions      Session[]
   docs          Doc[]
+  comments      Comment[]
   standards     Standard[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model VerificationToken {
@@ -76,26 +87,31 @@ model VerificationToken {
 
 // 批注模型
 model Comment {
-  groupId           String   @id    // 使用 groupId 作为主键
-  content          String
-  additionalContent String?
-  riskLevel        String?
-  userName         String
-  rangeText        String
-  createdDate      DateTime @default(now())
-  doc              Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
-  docId            String
+  id          String   @id @default(cuid())
+  content     String   // 评论内容
+  riskLevel   String?  // 风险等级
+  position    Json?    // 评论在文档中的位置信息
+  userId      String   // 评论者ID
+  user        User     @relation(fields: [userId], references: [id])
+  doc         Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
+  docId       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([docId])
 }
 
 // 审核标准模型
 model Standard {
   id        String   @id @default(cuid())
   title     String
+  rules     Rule[]
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  rules     Rule[]
+
+  @@index([userId])
 }
 
 // 审核规则模型
@@ -105,9 +121,10 @@ model Rule {
   level      String   // 风险等级
   principle  String   // 审核原则
   clause     String   // 标准条款
-  submitter  String   // 提交人
+  standardId String
+  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
-  standardId String
+
+  @@index([standardId])
 }
