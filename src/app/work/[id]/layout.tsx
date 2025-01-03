@@ -3,7 +3,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import WorkNav from "@/components/WorkNav";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +24,7 @@ export default function Layout({
 
   return (
     <ResizablePanelGroup direction="horizontal" className="min-h-screen">
-      <ResizablePanel defaultSize={15}>
+      <ResizablePanel defaultSize={15} minSize={10}>
         <div className="flex flex-col h-full bg-muted text-muted-foreground p-2">
           <div>
             <UserSettingButton />
@@ -46,10 +45,6 @@ export default function Layout({
                 &nbsp;&nbsp;标准设置
               </Button>
             </Link>
-            {/* <Button className="w-full justify-start px-2" variant="ghost">
-              <Users className="h-4 w-4" />
-              &nbsp;&nbsp;协同文档
-            </Button> */}
           </div>
           <Separator className="my-4" />
           <ScrollArea className="flex-auto">{directory}</ScrollArea>
@@ -60,7 +55,7 @@ export default function Layout({
               &nbsp;&nbsp;回收站
             </Button>
             <SignOutButton
-              className="w-full justify-start px-2 "
+              className="w-full justify-start px-2"
               variant="ghost"
             >
               <LogOut className="h-4 w-4" />
@@ -69,12 +64,27 @@ export default function Layout({
           </div>
         </div>
       </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={85}>
-        <div className="h-full flex flex-col">
-          {/* <WorkNav workId={id} /> */}
 
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={60} minSize={30}>
+        <div className="h-full flex flex-col">
           <div className="flex-1">{children}</div>
+        </div>
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={25} minSize={15}>
+        <div className="h-full bg-muted/30 p-4">
+          <h2 className="text-lg font-semibold mb-4">批注区</h2>
+          <div className="space-y-4">
+            <div className="bg-card p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                这里将显示文档批注...
+              </p>
+            </div>
+          </div>
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>

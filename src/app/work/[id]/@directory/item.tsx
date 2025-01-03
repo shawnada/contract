@@ -10,7 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { del } from "./action";
+import { handleDocDelete } from "@/components/doc-operations";
+import { useRouter } from "next/navigation";
 
 interface IProps {
   id: string;
@@ -20,6 +21,14 @@ interface IProps {
 
 export default function Item(props: IProps) {
   const { id, title, isCurrent } = props;
+  const router = useRouter();
+
+  const handleDelete = async () => {
+    const success = await handleDocDelete(id);
+    if (success) {
+      router.refresh();
+    }
+  };
 
   return (
     <div
@@ -39,10 +48,7 @@ export default function Item(props: IProps) {
             <Ellipsis className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => del(id)}
-            >
+            <DropdownMenuItem className="cursor-pointer" onClick={handleDelete}>
               <Trash2 className="h-4 w-4" />
               &nbsp;删除
             </DropdownMenuItem>
