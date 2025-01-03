@@ -3,6 +3,7 @@ import { getDoc } from "./action";
 import Title from "./title";
 import OnlyOfficeEditor from "./onlyoffice-editor";
 import { EditorProvider } from "./editor-context";
+import { revalidatePath } from "next/cache";
 
 export default async function WorkPage({ params }: { params: { id: string } }) {
   const id = params.id;
@@ -14,6 +15,8 @@ export default async function WorkPage({ params }: { params: { id: string } }) {
         <p>找不到文档...</p>
       </div>
     );
+
+  revalidatePath(`/work/${id}`);
 
   return (
     <EditorProvider>

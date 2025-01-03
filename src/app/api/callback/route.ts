@@ -15,10 +15,9 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     console.log("Callback data:", data);
 
-    // 从URL参数获取文档ID和版本
+    // 从URL参数获取文档ID
     const searchParams = req.nextUrl.searchParams;
     const docId = searchParams.get("docId");
-    const currentVersion = parseInt(searchParams.get("version") || "0", 10);
 
     if (!docId) {
       console.error("Document ID not provided");
@@ -35,10 +34,6 @@ export async function POST(req: NextRequest) {
       console.error("Document not found");
       return Response.json({ error: "Document not found" }, { status: 404 });
     }
-
-    // 确保用户目录存在
-    const userFolderPath = join(BASE_STORAGE_PATH, doc.userId);
-    await mkdir(userFolderPath, { recursive: true });
 
     // 处理OnlyOffice的回调
     switch (data.status) {
@@ -59,13 +54,13 @@ export async function POST(req: NextRequest) {
 
           // 使用文档的fileKey构建文件名
           const fileName = `${doc.fileKey}.docx`;
-          const filePath = join(userFolderPath, fileName);
+          const filePath = join(BASE_STORAGE_PATH, doc.userId, fileName);
 
           console.log("Saving document to:", filePath);
           await writeFile(filePath, Buffer.from(content));
 
           // 更新文档版本
-          const newVersion = currentVersion + 1;
+          const newVersion = doc.version + 1;
           await prisma.doc.update({
             where: { id: docId },
             data: { version: newVersion },

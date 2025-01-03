@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { updateDoc } from "./action";
+import { updateDoc, getDoc } from "./action";
 
 interface OnlyOfficeEditorProps {
   id: string;
@@ -16,7 +16,6 @@ export default function OnlyOfficeEditor({
 }: OnlyOfficeEditorProps) {
   const editorRef = useRef<any>(null);
   const isCreatingRef = useRef(false);
-  const lastSaveVersionRef = useRef(version);
 
   useEffect(() => {
     async function initEditor() {
@@ -26,6 +25,9 @@ export default function OnlyOfficeEditor({
       }
 
       try {
+        const latestDoc = await getDoc(id);
+        const latestVersion = latestDoc?.version || version;
+
         let documentUrl = content;
 
         if (!content && !isCreatingRef.current) {
@@ -50,9 +52,9 @@ export default function OnlyOfficeEditor({
           const config = {
             document: {
               fileType: "docx",
-              key: `${id}_${version}`,
+              key: `${id}_${latestVersion}`,
               title: "Document.docx",
-              url: `${window.location.origin}${documentUrl}?v=${version}`,
+              url: `${window.location.origin}${documentUrl}`,
               permissions: {
                 download: true,
                 edit: true,
@@ -67,7 +69,7 @@ export default function OnlyOfficeEditor({
             },
             documentType: "word",
             editorConfig: {
-              callbackUrl: `${window.location.origin}/api/callback?docId=${id}&version=${version}`,
+              callbackUrl: `${window.location.origin}/api/callback?docId=${id}`,
               lang: "zh-CN",
               mode: "edit",
               user: {
@@ -95,6 +97,12 @@ export default function OnlyOfficeEditor({
             events: {
               onDocumentStateChange: async (event: any) => {
                 console.log("Document state changed:", event);
+                if (event.type === "save") {
+                  const updatedDoc = await getDoc(id);
+                  if (updatedDoc && updatedDoc.version !== latestVersion) {
+                    window.location.reload();
+                  }
+                }
               },
               onError: (event: any) => {
                 console.error("OnlyOffice error:", event);
@@ -123,7 +131,7 @@ export default function OnlyOfficeEditor({
             height: "100%",
             width: "100%",
             type: "desktop",
-            token: `${id}_${version}`,
+            token: `${id}_${latestVersion}`,
           };
 
           console.log("Initializing editor with config:", config);

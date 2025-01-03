@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { isMobileDevice } from "@/lib/isMobileDevice";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -11,40 +12,28 @@ export const metadata: Metadata = {
   description: "审核系统",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
-  const isMobile = await isMobileDevice();
-
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <script
-          type="text/javascript"
-          src="http://192.168.73.73:8888/web-apps/apps/api/documents/api.js"
+          src={`${process.env.NEXT_PUBLIC_ONLYOFFICE_API_URL}/web-apps/apps/api/documents/api.js`}
           async
         />
       </head>
-      <body className={inter.className}>
-        {isMobile && (
-          <div className="h-screen flex flex-col items-center justify-center">
-            <p>
-              <strong>文本审核系统</strong>
-            </p>
-          </div>
-        )}
-        {!isMobile && (
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
-        )}
+      <body className={cn("min-h-screen bg-background font-sans antialiased")}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
