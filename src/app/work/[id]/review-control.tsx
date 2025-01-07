@@ -424,7 +424,13 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
           try {
             // 检查是否是包含 result 字段的对象
             if (response.result) {
-              result = JSON.parse(response.result);
+              // 清理 markdown 代码块标记
+              const cleanedResult = response.result
+                .replace(/```json\n?/g, "") // 移除开始的 ```json
+                .replace(/```\n?/g, "") // 移除结束的 ```
+                .trim(); // 移除多余的空白
+
+              result = JSON.parse(cleanedResult);
               console.log("解析后的 AI 响应:", result);
             } else {
               // 如果直接是数组

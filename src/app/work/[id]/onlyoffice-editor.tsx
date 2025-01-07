@@ -212,7 +212,7 @@ export default function OnlyOfficeEditor({
                     );
                   }
 
-                  let mappingCompleted = false;
+                  let mappedCount = 0;
 
                   // 获取数据库批注
                   console.log("Fetching database comments...");
@@ -316,142 +316,120 @@ export default function OnlyOfficeEditor({
                   };
 
                   // 获取文档批注
-                  if (!mappingCompleted) {
-                    console.log("Getting document comments...");
-                    const docComments = await tryGetComments();
+                  console.log("Getting document comments...");
+                  const docComments = await tryGetComments();
 
-                    if (docComments.length > 0) {
-                      console.log("Document comments retrieved:", {
-                        count: docComments.length,
-                        comments: docComments,
+                  if (docComments.length > 0) {
+                    console.log("Document comments retrieved:", {
+                      count: docComments.length,
+                      comments: docComments,
+                    });
+
+                    // 匹配批注
+                    for (const dbComment of dbComments) {
+                      console.log("Processing database comment:", {
+                        id: dbComment.id,
+                        guid: dbComment.guid,
+                        content: dbComment.content,
+                        documentCommentId: dbComment.documentCommentId,
                       });
 
-                      // 匹配批注
-                      for (const dbComment of dbComments) {
-                        if (mappingCompleted) {
-                          console.log(
-                            "Skipping remaining comments as mapping is completed",
-                          );
-                          break;
-                        }
+                      const matchingDocComment = docComments.find(
+                        (docComment) => {
+                          const matches = docComment.guid === dbComment.guid;
+                          console.log("Comparing GUIDs:", {
+                            dbGuid: dbComment.guid,
+                            docGuid: docComment.guid,
+                            matches,
+                          });
+                          return matches;
+                        },
+                      );
 
-                        console.log("Processing database comment:", {
-                          id: dbComment.id,
-                          guid: dbComment.guid,
-                          content: dbComment.content,
-                          documentCommentId: dbComment.documentCommentId,
-                        });
-
-                        console.log(
-                          "Available document comments:",
-                          docComments.map((dc) => ({
-                            id: dc.id,
-                            guid: dc.guid,
-                            text: dc.data.Text,
-                          })),
-                        );
-
-                        const matchingDocComment = docComments.find(
-                          (docComment) => {
-                            const matches = docComment.guid === dbComment.guid;
-                            console.log("Comparing GUIDs:", {
-                              dbGuid: dbComment.guid,
-                              docGuid: docComment.guid,
-                              matches,
-                            });
-                            return matches;
-                          },
-                        );
-
-                        if (matchingDocComment) {
-                          try {
-                            const updateResponse = await fetch(
-                              `/api/comments/${dbComment.id}`,
-                              {
-                                method: "PATCH",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({
-                                  documentCommentId: matchingDocComment.id,
-                                  isLocated: true,
-                                }),
-                              },
-                            );
-
-                            if (updateResponse.ok) {
-                              const updatedComment =
-                                await updateResponse.json();
-
-                              // 验证更新是否成功
-                              if (
-                                updatedComment.documentCommentId ===
-                                matchingDocComment.id
-                              ) {
-                                console.log(
-                                  "Comment mapping successfully verified:",
-                                  {
-                                    dbCommentId: dbComment.id,
-                                    documentCommentId:
-                                      updatedComment.documentCommentId,
-                                    isLocated: updatedComment.isLocated,
-                                  },
-                                );
-
-                                // 只有在验证成功后才设置 mappingCompleted
-                                mappingCompleted = true;
-
-                                // 立即测试跳转
-                                console.log(
-                                  "Testing jump to comment:",
-                                  updatedComment.documentCommentId,
-                                );
-                                editorRef.current.connector.executeMethod(
-                                  "MoveToComment",
-                                  [updatedComment.documentCommentId],
-                                  (result: any) => {
-                                    console.log(
-                                      "Jump to comment result:",
-                                      result,
-                                    );
-                                  },
-                                );
-
-                                break;
-                              } else {
-                                console.error(
-                                  "Comment mapping verification failed:",
-                                  {
-                                    expected: matchingDocComment.id,
-                                    actual: updatedComment.documentCommentId,
-                                  },
-                                );
-                              }
-                            }
-                          } catch (error) {
-                            console.error(
-                              "Failed to update comment mapping:",
-                              error,
-                            );
-                          }
-                        } else {
-                          console.log(
-                            "No matching document comment found for:",
+                      if (matchingDocComment) {
+                        try {
+                          const updateResponse = await fetch(
+                            `/api/comments/${dbComment.id}`,
                             {
-                              dbCommentId: dbComment.id,
-                              dbCommentGuid: dbComment.guid,
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                documentCommentId: matchingDocComment.id,
+                                isLocated: true,
+                              }),
                             },
                           );
-                        }
-                      }
 
-                      if (mappingCompleted) {
-                        console.log("Comment mapping completed successfully");
-                        return; // 完成映射后直接返回
+                          if (updateResponse.ok) {
+                            const updatedComment = await updateResponse.json();
+                            if (
+                              updatedComment.documentCommentId ===
+                              matchingDocComment.id
+                            ) {
+                              console.log(
+                                "Comment mapping successfully verified:",
+                                {
+                                  dbCommentId: dbComment.id,
+                                  documentCommentId:
+                                    updatedComment.documentCommentId,
+                                  isLocated: updatedComment.isLocated,
+                                },
+                              );
+
+                              mappedCount++;
+                              console.log(
+                                `Successfully mapped ${mappedCount}/${dbComments.length} comments`,
+                              );
+
+                              // 测试跳转
+                              console.log(
+                                "Testing jump to comment:",
+                                updatedComment.documentCommentId,
+                              );
+                              editorRef.current.connector.executeMethod(
+                                "MoveToComment",
+                                [updatedComment.documentCommentId],
+                                (result: any) => {
+                                  console.log(
+                                    "Jump to comment result:",
+                                    result,
+                                  );
+                                },
+                              );
+                            } else {
+                              console.error(
+                                "Comment mapping verification failed:",
+                                {
+                                  expected: matchingDocComment.id,
+                                  actual: updatedComment.documentCommentId,
+                                },
+                              );
+                            }
+                          } else {
+                            console.error("Failed to update comment:", {
+                              status: updateResponse.status,
+                              statusText: updateResponse.statusText,
+                            });
+                          }
+                        } catch (error) {
+                          console.error(
+                            "Failed to update comment mapping:",
+                            error,
+                          );
+                        }
+                      } else {
+                        console.log("No matching document comment found for:", {
+                          dbCommentId: dbComment.id,
+                          dbCommentGuid: dbComment.guid,
+                        });
                       }
                     }
-                  } else {
-                    console.log("Mapping already completed, skipping...");
+
+                    console.log(
+                      `Comment mapping completed: ${mappedCount}/${dbComments.length} comments mapped`,
+                    );
                   }
                 } catch (error) {
                   console.error("Error in comment mapping process:", error);
