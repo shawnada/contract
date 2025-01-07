@@ -15,8 +15,6 @@
   "dependencies": {
     "@auth/prisma-adapter": "^1.5.1",
     "@hookform/resolvers": "^3.3.4",
-    "@hufe921/canvas-editor": "^0.9.98",
-    "@hufe921/canvas-editor-plugin-docx": "^0.0.5",
     "@prisma/client": "^5.11.0",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-avatar": "^1.0.4",

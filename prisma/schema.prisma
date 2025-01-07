@@ -87,18 +87,26 @@ model VerificationToken {
 
 // 批注模型
 model Comment {
-  id          String   @id @default(cuid())
-  content     String   // 评论内容
-  riskLevel   String?  // 风险等级
-  position    Json?    // 评论在文档中的位置信息
-  userId      String   // 评论者ID
-  user        User     @relation(fields: [userId], references: [id])
-  doc         Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
-  docId       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  content          String   @db.Text
+  additionalContent String? @db.Text
+  riskLevel        String
+  userName         String
+  rangeText        String   @db.Text
+  documentCommentId String?
+  isLocated        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // 关联到文档
+  documentId      String
+  document        Doc      @relation(fields: [documentId], references: [id])
+  // 关联到用户
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
 
-  @@index([docId])
+  @@index([documentId])
+  @@index([userId])
 }
 
 // 审核标准模型
@@ -121,10 +129,11 @@ model Rule {
   level      String   // 风险等级
   principle  String   // 审核原则
   clause     String   // 标准条款
-  standardId String
-  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  submitter  String   // 添加这一行
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  standardId String
 
   @@index([standardId])
 }

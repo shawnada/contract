@@ -6,32 +6,21 @@ import { EditorProvider } from "./editor-context";
 import { revalidatePath } from "next/cache";
 
 export default async function WorkPage({ params }: { params: { id: string } }) {
-  const id = params.id;
-  const doc = await getDoc(id);
-
-  if (doc == null)
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        <p>找不到文档...</p>
-      </div>
-    );
-
-  revalidatePath(`/work/${id}`);
+  const doc = await getDoc(params.id);
+  if (!doc) return null;
 
   return (
-    <EditorProvider>
-      <div className="flex flex-col h-full">
-        <div className="flex-none">
-          <Title id={id} title={doc.title} />
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <OnlyOfficeEditor
-            id={id}
-            content={doc.content}
-            version={doc.version}
-          />
-        </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-none">
+        <Title id={params.id} title={doc.title} />
       </div>
-    </EditorProvider>
+      <div className="flex-1 overflow-hidden">
+        <OnlyOfficeEditor
+          id={params.id}
+          content={doc.content}
+          version={doc.version}
+        />
+      </div>
+    </div>
   );
 }

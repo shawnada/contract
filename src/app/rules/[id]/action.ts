@@ -36,17 +36,42 @@ export async function getStandard(id: string) {
 }
 
 export async function createStandard() {
-  const user = await getUserInfo();
-  if (!user?.id) throw new Error("Unauthorized");
+  try {
+    const user = await getUserInfo();
+    if (!user?.id) throw new Error("Unauthorized");
 
-  const standard = await db.standard.create({
-    data: {
-      title: "未命名标准",
+    // 先检查用户是否存在
+    const existingUser = await db.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!existingUser) {
+      throw new Error(`User not found: ${user.id}`);
+    }
+
+    console.log("Creating standard for user:", {
       userId: user.id,
-    },
-  });
-  revalidatePath("/rules");
-  return standard;
+      userEmail: user.email,
+    });
+
+    const standard = await db.standard.create({
+      data: {
+        title: "未命名标准",
+        userId: user.id,
+      },
+    });
+
+    console.log("Standard created:", standard);
+    revalidatePath("/rules");
+    return standard;
+  } catch (error) {
+    console.error("Error creating standard:", {
+      error,
+      userId: user?.id,
+      userEmail: user?.email,
+    });
+    throw error;
+  }
 }
 
 export async function updateStandard(id: string, data: { title?: string }) {

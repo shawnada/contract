@@ -1,16 +1,15 @@
 "use client";
 
 import { createContext, useContext, useRef } from "react";
-import type Editor from "@hufe921/canvas-editor";
 
 interface EditorContextType {
-  editorRef: React.MutableRefObject<Editor | null>;
+  editorRef: React.MutableRefObject<any>;
 }
 
-const EditorContext = createContext<EditorContextType | null>(null);
+const EditorContext = createContext<EditorContextType | undefined>(undefined);
 
 export function EditorProvider({ children }: { children: React.ReactNode }) {
-  const editorRef = useRef<Editor | null>(null);
+  const editorRef = useRef<any>(null);
 
   return (
     <EditorContext.Provider value={{ editorRef }}>
@@ -21,8 +20,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
 export function useEditorContext() {
   const context = useContext(EditorContext);
-  if (!context) {
-    throw new Error("useEditorContext must be used within EditorProvider");
+  if (context === undefined) {
+    throw new Error("useEditorContext must be used within an EditorProvider");
   }
   return context;
 }
