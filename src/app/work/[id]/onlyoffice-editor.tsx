@@ -171,114 +171,174 @@ export default function OnlyOfficeEditor({
               },
               onDocumentReady: async () => {
                 console.log("Document is ready");
-                if (connectorRef.current) {
+
+                // 等待编辑器和连接器初始化
+                const waitForEditor = async (
+                  retries = 0,
+                  maxRetries = 10,
+                  delay = 1000,
+                ): Promise<boolean> => {
+                  if (editorRef.current?.connector) {
+                    return true;
+                  }
+
+                  if (retries >= maxRetries) {
+                    return false;
+                  }
+
+                  console.log(
+                    `Waiting for editor initialization (${retries + 1}/${maxRetries})...`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, delay));
+                  return waitForEditor(retries + 1, maxRetries, delay);
+                };
+
+                // 等待编辑器初始化
+                const isEditorReady = await waitForEditor();
+                if (!isEditorReady) {
+                  console.error("Editor failed to initialize after retries");
+                  return;
+                }
+
+                // 添加重试机制的函数
+                const tryGetComments = async (
+                  retries = 0,
+                  maxRetries = 5,
+                  delay = 1000,
+                ) => {
                   try {
-                    // 1. 获取数据库中的批注
-                    const response = await fetch(
-                      `/api/comments?documentId=${id}`,
-                    );
-                    if (!response.ok) {
-                      throw new Error("Failed to fetch comments");
-                    }
-                    const dbComments = await response.json();
-
-                    // 2. 使用 executeMethod 获取文档中的所有批注
-                    editorRef.current.connector.executeMethod(
-                      "GetAllComments",
-                      [],
-                      async (docComments: any[]) => {
-                        // 详细打印文档批注结构
-                        console.log(
-                          "Document comments full structure:",
-                          docComments?.map((c) => ({
-                            id: c.Id,
-                            data:
-                              typeof c.Data === "object"
-                                ? JSON.stringify(c.Data)
-                                : c.Data,
-                            text: c.Text,
-                            quote: c.QuoteText,
-                            allProps: Object.keys(c),
-                            fullData: c,
-                          })),
+                    return await new Promise((resolve, reject) => {
+                      // 再次检查编辑器和连接器
+                      if (!editorRef.current?.connector) {
+                        console.error(
+                          "Editor or connector lost during operation",
                         );
+                        reject(new Error("Editor or connector not available"));
+                        return;
+                      }
 
-                        // 3. 遍历数据库批注，根据内容匹配文档批注
-                        for (const dbComment of dbComments) {
-                          const matchingDocComment = docComments?.find(
-                            (docComment) => {
-                              try {
-                                // 解析 Data 对象
-                                const data =
-                                  typeof docComment.Data === "object"
-                                    ? docComment.Data
-                                    : JSON.parse(docComment.Data);
-
-                                // 获取批注文本内容
-                                const commentText = data.Text || "";
-
-                                // 检查批注内容是否匹配
-                                return commentText.includes(dbComment.content);
-                              } catch (error) {
-                                console.error(
-                                  "Error parsing comment data:",
-                                  error,
-                                );
-                                return false;
-                              }
-                            },
+                      editorRef.current.connector.executeMethod(
+                        "GetAllComments",
+                        [],
+                        (docComments: any[]) => {
+                          console.log(
+                            `Attempt ${retries + 1}: Found ${docComments?.length || 0} comments`,
                           );
 
-                          if (matchingDocComment) {
-                            // 4. 更新数据库中的 documentCommentId
-                            try {
-                              const updateResponse = await fetch(
-                                `/api/comments/${dbComment.id}`,
-                                {
-                                  method: "PATCH",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    documentCommentId: matchingDocComment.Id,
-                                    isLocated: true,
-                                  }),
-                                },
-                              );
-
-                              if (updateResponse.ok) {
-                                console.log("Updated comment mapping:", {
-                                  dbComment,
-                                  matchingDocComment,
-                                  dbCommentId: dbComment.id,
-                                  newDocumentCommentId: matchingDocComment.Id,
-                                });
-                              }
-                            } catch (error) {
-                              console.error(
-                                "Failed to update comment mapping:",
-                                error,
-                              );
+                          if (!docComments || docComments.length === 0) {
+                            if (retries < maxRetries) {
+                              console.log(`Retrying in ${delay}ms...`);
+                              setTimeout(() => {
+                                tryGetComments(retries + 1, maxRetries, delay)
+                                  .then(resolve)
+                                  .catch(reject);
+                              }, delay);
+                            } else {
+                              resolve([]);
                             }
-                          } else {
-                            // 如果找不到匹配的文档批注，标记为未定位
-                            await fetch(`/api/comments/${dbComment.id}`, {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({
-                                documentCommentId: null,
-                                isLocated: false,
-                              }),
-                            });
+                            return;
                           }
+
+                          resolve(docComments);
+                        },
+                      );
+                    });
+                  } catch (error) {
+                    console.error("Error getting comments:", error);
+                    if (retries < maxRetries) {
+                      await new Promise((resolve) =>
+                        setTimeout(resolve, delay),
+                      );
+                      return tryGetComments(retries + 1, maxRetries, delay);
+                    }
+                    throw error;
+                  }
+                };
+
+                try {
+                  // 1. 获取数据库中的批注
+                  const response = await fetch(
+                    `/api/comments?documentId=${id}`,
+                  );
+                  if (!response.ok) {
+                    throw new Error("Failed to fetch comments");
+                  }
+                  const dbComments = await response.json();
+
+                  // 2. 使用重试机制获取文档批注
+                  const docComments = await tryGetComments();
+
+                  if (docComments.length === 0) {
+                    console.log("No document comments found after retries");
+                    return;
+                  }
+
+                  // 3. 遍历数据库批注，根据内容匹配文档批注
+                  for (const dbComment of dbComments) {
+                    const matchingDocComment = docComments?.find(
+                      (docComment) => {
+                        try {
+                          const data =
+                            typeof docComment.Data === "object"
+                              ? docComment.Data
+                              : JSON.parse(docComment.Data);
+
+                          const commentText = data.Text || "";
+                          return commentText.includes(dbComment.content);
+                        } catch (error) {
+                          console.error("Error parsing comment data:", error);
+                          return false;
                         }
                       },
                     );
-                  } catch (error) {
-                    console.error("Error in document ready handler:", error);
+
+                    if (matchingDocComment) {
+                      // 4. 更新数据库中的 documentCommentId
+                      try {
+                        const updateResponse = await fetch(
+                          `/api/comments/${dbComment.id}`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                              documentCommentId: matchingDocComment.Id,
+                              isLocated: true,
+                            }),
+                          },
+                        );
+
+                        if (updateResponse.ok) {
+                          console.log("Updated comment mapping:", {
+                            dbComment,
+                            matchingDocComment,
+                            dbCommentId: dbComment.id,
+                            newDocumentCommentId: matchingDocComment.Id,
+                          });
+                        }
+                      } catch (error) {
+                        console.error(
+                          "Failed to update comment mapping:",
+                          error,
+                        );
+                      }
+                    } else {
+                      // 如果找不到匹配的文档批注，标记为未定位
+                      await fetch(`/api/comments/${dbComment.id}`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          documentCommentId: null,
+                          isLocated: false,
+                        }),
+                      });
+                    }
                   }
+                } catch (error) {
+                  console.error("Error in document ready handler:", error);
                 }
               },
               onDocumentStateChange: async (event: any) => {
