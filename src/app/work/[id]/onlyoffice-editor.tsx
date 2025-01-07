@@ -135,11 +135,6 @@ export default function OnlyOfficeEditor({
                 mode: "fast",
                 fastEditing: true,
               },
-              review: {
-                trackChanges: false,
-                displayChanges: false,
-                showReviewChanges: false,
-              },
             },
             events: {
               onAppReady: () => {
