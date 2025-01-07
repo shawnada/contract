@@ -229,11 +229,7 @@ export default function OnlyOfficeEditor({
                   });
 
                   // 定义获取批注的函数
-                  const tryGetComments = async (
-                    retries = 0,
-                    maxRetries = 5,
-                    delay = 1000,
-                  ) => {
+                  const tryGetComments = async () => {
                     try {
                       if (!editorRef.current?.connector) {
                         throw new Error("Editor connector not available");
@@ -245,72 +241,102 @@ export default function OnlyOfficeEditor({
                           "GetAllComments",
                           [],
                           async (docComments: any[]) => {
-                            console.log("GetAllComments response:", {
-                              count: docComments?.length || 0,
-                              comments: docComments,
-                            });
+                            try {
+                              // 获取数据库批注列表
+                              const dbResponse = await fetch(
+                                `/api/comments?documentId=${id}`,
+                              );
+                              const dbComments = await dbResponse.json();
 
-                            if (!docComments || docComments.length === 0) {
-                              resolve([]);
-                              return;
-                            }
+                              // 打印两边的批注顺序对比
+                              console.log("Comments order comparison:");
+                              console.log(
+                                "Database comments order:",
+                                dbComments.map((c) => ({
+                                  id: c.id,
+                                  guid: c.guid,
+                                  content: c.content.substring(0, 50) + "...",
+                                  createdAt: c.createdAt,
+                                })),
+                              );
 
-                            const parsedComments = docComments
-                              .map((comment) => {
-                                try {
+                              console.log(
+                                "Document comments order:",
+                                docComments.map((c, index) => {
                                   const data =
-                                    typeof comment.Data === "object"
-                                      ? comment.Data
-                                      : JSON.parse(comment.Data);
+                                    typeof c.Data === "object"
+                                      ? c.Data
+                                      : JSON.parse(c.Data || "{}");
 
                                   let guid = null;
-                                  const htmlCommentMatch =
-                                    data.Text.match(/<!--GUID:(.*?)-->/);
-                                  if (htmlCommentMatch) {
-                                    guid = htmlCommentMatch[1];
+                                  if (data.Text) {
+                                    const match = data.Text.match(
+                                      /\u200B\[GUID:(.*?)\]\u200B/,
+                                    );
+                                    if (match) guid = match[1];
                                   }
-
-                                  const invisibleMatch = data.Text.match(
-                                    /\u200B\[GUID:(.*?)\]\u200B/,
-                                  );
-                                  if (invisibleMatch) {
-                                    guid = invisibleMatch[1];
-                                  }
-
-                                  console.log("Successfully parsed comment:", {
-                                    id: comment.Id,
-                                    guid,
-                                    text: data.Text,
-                                  });
 
                                   return {
-                                    id: comment.Id,
-                                    guid: guid,
-                                    data: data,
+                                    index,
+                                    id: c.Id,
+                                    guid,
+                                    text: data.Text
+                                      ? data.Text.substring(0, 50) + "..."
+                                      : "N/A",
                                   };
-                                } catch (error) {
-                                  console.error("解析批注数据失败:", error);
-                                  return null;
-                                }
-                              })
-                              .filter(Boolean);
+                                }),
+                              );
 
-                            if (parsedComments.length > 0) {
-                              console.log("Successfully parsed comments");
+                              // 继续原有的解析逻辑
+                              if (!docComments?.length) {
+                                resolve([]);
+                                return;
+                              }
+
+                              const parsedComments = docComments
+                                .map((comment) => {
+                                  try {
+                                    const data =
+                                      typeof comment.Data === "object"
+                                        ? comment.Data
+                                        : JSON.parse(comment.Data || "{}");
+
+                                    let guid = null;
+                                    if (data.Text) {
+                                      const match = data.Text.match(
+                                        /\u200B\[GUID:(.*?)\]\u200B/,
+                                      );
+                                      if (match) guid = match[1];
+                                    }
+
+                                    return {
+                                      id: comment.Id,
+                                      guid,
+                                      data,
+                                    };
+                                  } catch (error) {
+                                    console.error(
+                                      "Failed to parse comment:",
+                                      error,
+                                    );
+                                    return null;
+                                  }
+                                })
+                                .filter(Boolean);
+
+                              resolve(parsedComments);
+                            } catch (error) {
+                              console.error(
+                                "Error in comment processing:",
+                                error,
+                              );
+                              reject(error);
                             }
-
-                            resolve(parsedComments);
                           },
                         );
                       });
                     } catch (error) {
                       console.error("Error getting comments:", error);
-                      if (retries < maxRetries && !mappingCompleted) {
-                        await new Promise((resolve) =>
-                          setTimeout(resolve, delay),
-                        );
-                        return tryGetComments(retries + 1, maxRetries, delay);
-                      }
                       throw error;
                     }
                   };
