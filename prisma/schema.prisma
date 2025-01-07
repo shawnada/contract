@@ -1,50 +1,41 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// 数据模型
 model Doc {
-    id        String   @id @default(cuid())
-    title     String
-    content   String?  // 存储文档的URL路径
-    fileKey   String?  // 存储OnlyOffice文档的key
-    version   Int      @default(1) // 添加版本字段
-    status    String   @default("active") // 文档状态：active, archived, deleted
-    userId    String
-    user      User     @relation(fields: [userId], references: [id])
-    comments  Comment[]
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String    @id @default(cuid())
+  title     String
+  content   String?
+  fileKey   String?
+  version   Int       @default(1)
+  status    String    @default("active")
+  userId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  comments  Comment[]
+  user      User      @relation(fields: [userId], references: [id])
 
-    @@index([userId])
-    @@index([fileKey])
+  @@index([userId])
+  @@index([fileKey])
 }
 
-// NextAuth Adapter models
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -63,18 +54,18 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?    @unique
   emailVerified DateTime?
   image         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   accounts      Account[]
-  sessions      Session[]
-  docs          Doc[]
   comments      Comment[]
+  docs          Doc[]
+  sessions      Session[]
   standards     Standard[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 }
 
 model VerificationToken {
@@ -85,55 +76,50 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// 批注模型
 model Comment {
-  id               String   @id @default(cuid())
-  content          String   @db.Text
-  additionalContent String? @db.Text
-  riskLevel        String
-  userName         String
-  rangeText        String   @db.Text
+  id                String   @id @default(cuid())
+  content           String
+  riskLevel         String
+  userId            String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  additionalContent String?
   documentCommentId String?
-  isLocated        Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
-  // 关联到文档
-  documentId      String
-  document        Doc      @relation(fields: [documentId], references: [id])
-  // 关联到用户
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
+  documentId        String
+  isLocated         Boolean  @default(false)
+  rangeText         String
+  userName          String
+  guid              String   @unique
+  document          Doc      @relation(fields: [documentId], references: [id])
+  user              User     @relation(fields: [userId], references: [id])
 
   @@index([documentId])
   @@index([userId])
 }
 
-// 审核标准模型
 model Standard {
   id        String   @id @default(cuid())
   title     String
-  rules     Rule[]
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  rules     Rule[]
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
-// 审核规则模型
 model Rule {
   id         String   @id @default(cuid())
-  category   String   // 风险分类
-  level      String   // 风险等级
-  principle  String   // 审核原则
-  clause     String   // 标准条款
-  submitter  String   // 添加这一行
+  category   String
+  level      String
+  principle  String
+  clause     String
+  submitter  String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
   standardId String
+  standard   Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
 
   @@index([standardId])
 }

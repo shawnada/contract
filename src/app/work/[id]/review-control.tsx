@@ -28,15 +28,15 @@ interface ReviewControlProps {
 
 interface Comment {
   id: string;
+  guid: string;
   content: string;
   additionalContent?: string;
   riskLevel: string;
   userName: string;
   rangeText: string;
-  createdAt: Date;
-  isEditing?: boolean;
   documentCommentId?: string;
   isLocated: boolean;
+  createdAt: Date;
 }
 
 export default function ReviewControl({ docId }: ReviewControlProps) {
@@ -76,7 +76,12 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
       setIsLoading(true);
       try {
         const response = await fetch(`/api/comments?documentId=${docId}`);
-        if (!response.ok) throw new Error("Failed to fetch comments");
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to fetch comments: ${response.status} ${errorText}`,
+          );
+        }
         const data = await response.json();
         console.log("获取到批注数据:", data);
 
@@ -111,21 +116,17 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     });
   }, [comments]);
 
-  const addCommentToDocument = async (text: string, comment: Comment) => {
+  const addCommentToDocument = async (text: string, commentContent: string) => {
     if (!editorRef.current?.connector) {
       console.error("Editor connector not initialized");
       return;
     }
 
-    const comStr =
-      `风险等级：${comment.riskLevel}\n` +
-      `风险提示：${comment.content}\n` +
-      `修改建议：${comment.additionalContent || "无"}`;
-
+    // 使用 Asc.scope 传递参数
     (window as any).Asc = {
       scope: {
         searchText: text,
-        comStr: comStr,
+        commentContent: commentContent,
       },
     };
 
@@ -134,6 +135,7 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
         function () {
           try {
             var oDocument = Api.GetDocument();
+            // 使用 Asc.scope 中的值
             var searchResults = oDocument.Search(Asc.scope.searchText);
 
             if (!searchResults || searchResults.length === 0) {
@@ -144,7 +146,7 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             var oRange = searchResults[0];
             var oComments = Api.AddComment(
               oRange,
-              Asc.scope.comStr,
+              Asc.scope.commentContent,
               "AI审核",
               "ai-review",
             );
@@ -193,8 +195,13 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
   };
 
   const createComment = async (result: any) => {
+    // 生成 GUID
+    const guid = crypto.randomUUID();
+
+    // 创建新的批注对象
     const newComment: Comment = {
       id: crypto.randomUUID(),
+      guid,
       content: result.风险提示,
       additionalContent: result.修改建议,
       riskLevel: result.风险等级,
@@ -205,11 +212,19 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     };
 
     try {
-      // 先在文档中添加批注
+      // 构建批注内容，使用零宽空格隐藏 GUID
+      const commentContent =
+        `\u200B[GUID:${guid}]\u200B` + // 使用零宽空格包裹 GUID
+        `风险等级：${newComment.riskLevel}\n` +
+        `风险提示：${newComment.content}\n` +
+        `修改建议：${newComment.additionalContent || "无"}`;
+
+      // 在文档中添加批注
       const documentCommentId = await addCommentToDocument(
         result.原文,
-        newComment,
+        commentContent,
       );
+
       newComment.documentCommentId = documentCommentId;
       newComment.isLocated = true;
 
@@ -228,16 +243,11 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
       }
 
       const savedComment = await response.json();
-
-      // 更新状态
       setComments((prevComments) => [...prevComments, savedComment]);
     } catch (error) {
       console.error("创建批注失败:", error);
-      // 即使保存失败，也添加到列表中（但标记为未定位）
       setComments((prevComments) => [...prevComments, newComment]);
     }
-
-    return newComment;
   };
 
   const handleStrictReview = async () => {

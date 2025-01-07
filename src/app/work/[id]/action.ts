@@ -61,32 +61,49 @@ export async function deleteDoc(id: string) {
     // 获取文档信息
     const doc = await prisma.doc.findUnique({
       where: { id },
-      select: { userId: true, fileKey: true },
+      select: {
+        userId: true,
+        fileKey: true,
+        comments: true, // 获取相关的批注信息
+      },
     });
 
     if (!doc) {
       throw new Error("Document not found");
     }
 
-    // 如果有文件，删除物理文件
-    if (doc.fileKey) {
-      const filePath = join(
-        BASE_STORAGE_PATH!,
-        doc.userId,
-        `${doc.fileKey}.docx`,
-      );
-      try {
-        await unlink(filePath);
-        console.log("Physical file deleted:", filePath);
-      } catch (error) {
-        console.error("Error deleting physical file:", error);
-        // 继续执行，即使文件删除失败
+    // 开始事务，确保数据完整性
+    await prisma.$transaction(async (tx) => {
+      // 1. 先删除所有相关的批注
+      if (doc.comments.length > 0) {
+        console.log(
+          `Deleting ${doc.comments.length} comments for document ${id}`,
+        );
+        await tx.comment.deleteMany({
+          where: { documentId: id },
+        });
       }
-    }
 
-    // 删除数据库记录
-    await prisma.doc.delete({
-      where: { id },
+      // 2. 删除文档记录
+      await tx.doc.delete({
+        where: { id },
+      });
+
+      // 3. 如果有文件，删除物理文件
+      if (doc.fileKey) {
+        const filePath = join(
+          BASE_STORAGE_PATH!,
+          doc.userId,
+          `${doc.fileKey}.docx`,
+        );
+        try {
+          await unlink(filePath);
+          console.log("Physical file deleted:", filePath);
+        } catch (error) {
+          console.error("Error deleting physical file:", error);
+          // 继续执行，即使文件删除失败
+        }
+      }
     });
 
     // 重新验证路径
