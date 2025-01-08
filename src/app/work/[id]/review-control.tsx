@@ -39,6 +39,21 @@ interface Comment {
   createdAt: Date;
 }
 
+// 添加 UUID 生成函数
+function generateUUID() {
+  // 检查是否支持 crypto.randomUUID()
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  // 降级方案：手动生成 UUID
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function ReviewControl({ docId }: ReviewControlProps) {
   const { editorRef } = useEditorContext();
   const [standards, setStandards] = useState<Standard[]>([]);
@@ -194,59 +209,85 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     }
   };
 
-  const createComment = async (result: any) => {
-    // 生成 GUID
-    const guid = crypto.randomUUID();
-
-    // 创建新的批注对象
-    const newComment: Comment = {
-      id: crypto.randomUUID(),
-      guid,
-      content: result.风险提示,
-      additionalContent: result.修改建议,
-      riskLevel: result.风险等级,
-      userName: "AI审核",
-      rangeText: result.原文,
-      createdAt: new Date(),
-      isLocated: false,
-    };
-
+  const createComment = async ({
+    groupId,
+    content,
+    additionalContent,
+    riskLevel,
+    userName,
+    rangeText,
+    autoExpand = false,
+  }: {
+    groupId?: string;
+    content: string;
+    additionalContent?: string;
+    riskLevel: "高" | "中" | "低";
+    userName: string;
+    rangeText: string;
+    autoExpand?: boolean;
+  }) => {
     try {
-      // 构建批注内容，使用零宽空格隐藏 GUID
-      const commentContent =
-        `\u200B[GUID:${guid}]\u200B` + // 使用零宽空格包裹 GUID
-        `风险等级：${newComment.riskLevel}\n` +
-        `风险提示：${newComment.content}\n` +
-        `修改建议：${newComment.additionalContent || "无"}`;
+      // 使用 generateUUID 替代 crypto.randomUUID
+      const commentGroupId = groupId || generateUUID();
 
-      // 在文档中添加批注
-      const documentCommentId = await addCommentToDocument(
-        result.原文,
-        commentContent,
-      );
+      // 创建新的批注对象
+      const newComment: Comment = {
+        id: generateUUID(), // 这里也使用 generateUUID
+        guid: commentGroupId,
+        content,
+        additionalContent,
+        riskLevel,
+        userName,
+        rangeText,
+        createdAt: new Date(),
+        isLocated: false,
+      };
 
-      newComment.documentCommentId = documentCommentId;
-      newComment.isLocated = true;
+      try {
+        // 构建批注内容，使用零宽空格隐藏 GUID
+        const commentContent =
+          `\u200B[GUID:${commentGroupId}]\u200B` + // 使用零宽空格包裹 GUID
+          `风险等级：${newComment.riskLevel}\n` +
+          `风险提示：${newComment.content}\n` +
+          `修改建议：${newComment.additionalContent || "无"}`;
 
-      // 保存到数据库
-      const response = await fetch("/api/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentId: docId,
-          comment: newComment,
-        }),
-      });
+        // 在文档中添加批注
+        const documentCommentId = await addCommentToDocument(
+          newComment.rangeText,
+          commentContent,
+        );
 
-      if (!response.ok) {
-        throw new Error("Failed to save comment");
+        newComment.documentCommentId = documentCommentId;
+        newComment.isLocated = true;
+
+        // 保存到数据库
+        const response = await fetch("/api/comments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documentId: docId,
+            comment: newComment,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save comment");
+        }
+
+        const savedComment = await response.json();
+        setComments((prevComments) => [...prevComments, savedComment]);
+
+        return {
+          groupId: commentGroupId,
+          // ... 其他返回值 ...
+        };
+      } catch (error) {
+        console.error("创建批注失败:", error);
+        setComments((prevComments) => [...prevComments, newComment]);
       }
-
-      const savedComment = await response.json();
-      setComments((prevComments) => [...prevComments, savedComment]);
     } catch (error) {
       console.error("创建批注失败:", error);
-      setComments((prevComments) => [...prevComments, newComment]);
+      throw error;
     }
   };
 
@@ -447,7 +488,19 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             for (const item of result) {
               if (item.是否找到风险 === "是") {
                 console.log("发现风险项:", item);
-                await createComment(item); // 使用 await 等待批注创建完成
+                await createComment({
+                  content: `${item.风险提示}${
+                    item.主要增加哪方的风险
+                      ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                      : ""
+                  }`,
+                  additionalContent: item.修改建议,
+                  riskLevel: item.风险等级 as "高" | "中" | "低",
+                  userName: "System",
+                  rangeText: item.原文,
+                  autoExpand: false,
+                });
+                console.log("批注创建成功");
               }
             }
           } else {
