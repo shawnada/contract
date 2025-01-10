@@ -130,6 +130,11 @@ export default function OnlyOfficeEditor({
                 features: {
                   spellcheck: false,
                 },
+                theme: {
+                  name: "theme-gray",
+                  type: "dark",
+                },
+                uiTheme: "theme-gray",
               },
               coEditing: {
                 mode: "fast",
@@ -526,7 +531,7 @@ export default function OnlyOfficeEditor({
         editorRef.current = null;
       }
     };
-  }, [id, content, version]);
+  }, [id, content, version, editorRef]);
 
   return (
     <div

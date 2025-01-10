@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "文本审核系统",
   description: "审核系统",
+  icons: {
+    icon: null,
+  },
 };
 
 export default function RootLayout({

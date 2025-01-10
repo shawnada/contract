@@ -8,13 +8,15 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --check .",
-    "format:fix": "prettier --write --list-different .",
+    "format:fix": "prettier --write .",
     "prepare": "husky",
     "db:push": "prisma db push"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^1.5.1",
     "@hookform/resolvers": "^3.3.4",
+    "@hufe921/canvas-editor": "^0.9.98",
+    "@hufe921/canvas-editor-plugin-docx": "^0.0.5",
     "@prisma/client": "^5.11.0",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-avatar": "^1.0.4",
@@ -39,14 +41,14 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.51.2",
     "react-resizable-panels": "^2.0.13",
-    "react-split": "^2.0.14",
     "server-only": "^0.0.1",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
     "typed.js": "^2.1.0",
     "ua-parser-js": "^1.0.37",
     "xlsx": "^0.18.5",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "typescript": "5.3.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.2.1",

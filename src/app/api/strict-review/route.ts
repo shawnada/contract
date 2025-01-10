@@ -13,10 +13,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 打印请求体
     const body = await request.json();
-    // console.log('Request body:', body)
-
     const { rule, mainText } = body;
 
     if (!rule || !mainText) {
@@ -26,7 +23,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 检查 OpenAI 配置
     if (!process.env.OPENAI_API_KEY) {
       console.error("OpenAI API key not configured");
       return Response.json(
@@ -45,17 +41,15 @@ export async function POST(request: NextRequest) {
       - 审核原则: ${rule.principle}
       ${rule.clause ? `- 相关条款: ${rule.clause}` : ""}
 
-
-
       请检查合同中是否存在此类风险。你必须返回严格的JSON格式数组，格式如下：
       [
         {
-          "是否找到风险": "是",  
-          "主要增加哪方的风险": "乙方",
-          "原文": "违约金为合同总价的50%",
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
           "风险等级": "${rule.level}",
-          "风险提示": "违约金过高，超过合同总价的30%",
-          "修改建议": "违约金不超过造成损失的30%"
+          "风险提示": "",
+          "修改建议": ""
         }
       ]
 
@@ -70,11 +64,12 @@ export async function POST(request: NextRequest) {
 
       合同全文内容：
       ${mainText}
-      
       `;
 
-      // 打印完整提示词
-      // console.log('Prompt:', initialPrompt)
+      // 打印完整的提示词
+      console.log("发送给 AI 律师的提示词:");
+      console.log("----------------------------------------");
+      console.log(initialPrompt);
       console.log("----------------------------------------");
 
       const initialCompletion = await openai.chat.completions.create({
@@ -83,47 +78,45 @@ export async function POST(request: NextRequest) {
       });
 
       const initialResponse = initialCompletion.choices[0].message.content;
-
       console.log("AI律师回答:", initialResponse);
 
-      // 第二步：验证和过滤结果
+      // 打印验证提示词
       const verificationPrompt = `
-
       1.作为复查员，请严格检查AI律师返回的结果的格式是否为json格式，我们的格式示例为：
       [
         {
-          "是否找到风险": "是",  
-          "主要增加哪方的风险": "乙方",
-          "原文": "违约金为合同总价的50%",
-          "风险等级": "中",
-          "风险提示": "违约金过高，超过合同总价的30%",
-          "修改建议": "违约金不超过造成损失的30%"
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "",
+          "风险提示": "",
+          "修改建议": ""
         }
       ]
       2.是否除了json，没有返回任何其他任何多余内容
-      3.json中，如果“风险等级”的值为空，是符合规则的，并未要求必须填写
+      3.json中，如果"风险等级"的值为空，是符合规则的，并未要求必须填写
       3.AI律师返回结果：
       ${initialResponse}
-      4.你返回的结果应当在AI律师返回结果的基础上，增加“是否符合要求”和“不符合原因”两个字段
-      5.如果AI律师返回的结果格式错误，请在“是否符合要求”中填“否”，并写明“不符合原因”，否则填“是”
+      4.你返回的结果应当在AI律师返回结果的基础上，增加"是否符合要求"和"不符合原因"两个字段
+      5.如果AI律师返回的结果格式错误，请在"是否符合要求"中填"否"，并写明"不符合原因"，否则填"是"
       6.你应当返回的格式如下：
       [
         {
           "是否找到风险": "是",  
-          "主要增加哪方的风险": "乙方",
-          "原文": "违约金为合同总价的50%",
-          "风险等级": "中",
-          "风险提示": "违约金过高，超过合同总价的30%",
-          "修改建议": "违约金不超过造成损失的30%"
-          "是否符合要求": "是",
-          "不符合原因": "格式错误"
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "",
+          "风险提示": "",
+          "修改建议": ""
+          "是否符合要求": "",
+          "不符合原因": ""
         }
       ]
-
       `;
 
-      // 打印验证提示词
-      // console.log('Verification Prompt:', verificationPrompt)
+      console.log("发送给复查员的提示词:");
+      console.log("----------------------------------------");
+      console.log(verificationPrompt);
       console.log("----------------------------------------");
 
       const verificationCompletion = await openai.chat.completions.create({

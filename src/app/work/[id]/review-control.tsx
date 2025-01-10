@@ -150,7 +150,6 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
         function () {
           try {
             var oDocument = Api.GetDocument();
-            // 使用 Asc.scope 中的值
             var searchResults = oDocument.Search(Asc.scope.searchText);
 
             if (!searchResults || searchResults.length === 0) {
@@ -292,33 +291,103 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
   };
 
   const handleStrictReview = async () => {
-    console.log("开始审核，选中的标准ID:", selectedStandard);
-
-    if (!selectedStandard) {
-      console.warn("No standard selected");
-      return;
-    }
-
-    setIsReviewing(true);
     try {
-      console.log("正在获取文档内容...");
-      const docEditor = editorRef.current;
-      console.log("编辑器实例状态:", {
-        exists: !!docEditor,
-        type: typeof docEditor,
-        hasConnector: !!docEditor?.connector,
-        hasCallCommand: !!docEditor?.callCommand,
-        methods: docEditor ? Object.keys(docEditor) : [],
-      });
+      setIsReviewing(true);
 
-      if (!docEditor || !docEditor.connector) {
-        throw new Error("Editor or connector not initialized");
-      }
-
-      // 使用 connector 调用命令获取文档内容
+      // 获取文档内容
       const mainText = await new Promise((resolve, reject) => {
         try {
-          docEditor.connector.callCommand(
+          if (!editorRef.current?.connector) {
+            reject(new Error("Editor connector not initialized"));
+            return;
+          }
+
+          // 先获取表格内容
+          editorRef.current.connector.callCommand(
+            function () {
+              try {
+                console.log("开始获取表格内容...");
+                var oDocument = Api.GetDocument();
+                var aTables = oDocument.GetAllTables();
+                console.log("文档中的表格数量:", aTables.length);
+
+                // 遍历所有表格
+                if (aTables && aTables.length > 0) {
+                  for (
+                    var tableIndex = 0;
+                    tableIndex < aTables.length;
+                    tableIndex++
+                  ) {
+                    try {
+                      var table = aTables[tableIndex];
+                      var tableContent = [];
+
+                      // 获取表格行数
+                      var rowsCount = table.GetRowsCount();
+                      console.log(`表格 ${tableIndex + 1} 的行数:`, rowsCount);
+
+                      // 遍历每一行
+                      for (var row = 0; row < rowsCount; row++) {
+                        var rowContent = [];
+                        // 获取当前行
+                        var currentRow = table.GetRow(row);
+                        // 获取行中的单元格数量
+                        var cellsCount = currentRow.GetCellsCount();
+
+                        // 遍历行中的每个单元格
+                        for (var cell = 0; cell < cellsCount; cell++) {
+                          try {
+                            // 获取单元格
+                            var currentCell = currentRow.GetCell(cell);
+                            // 获取单元格内容
+                            var paragraphs = currentCell
+                              .GetContent()
+                              .GetAllParagraphs();
+                            var cellText = "";
+
+                            // 获取单元格中的所有段落文本
+                            for (var p = 0; p < paragraphs.length; p++) {
+                              cellText += paragraphs[p].GetText() + "\n";
+                            }
+
+                            rowContent.push(cellText.trim());
+                          } catch (cellError) {
+                            console.warn(
+                              `获取单元格内容失败 [${row}][${cell}]:`,
+                              cellError,
+                            );
+                            rowContent.push("");
+                          }
+                        }
+
+                        tableContent.push(rowContent);
+                      }
+
+                      console.log(`表格 ${tableIndex + 1} 内容:`, {
+                        rowCount: rowsCount,
+                        content: tableContent,
+                      });
+                    } catch (tableError) {
+                      console.error(
+                        `处理表格 ${tableIndex + 1} 时出错:`,
+                        tableError,
+                      );
+                    }
+                  }
+                } else {
+                  console.log("文档中没有找到表格");
+                }
+              } catch (error) {
+                console.error("获取表格时出错:", error);
+              }
+            },
+            function (result) {
+              console.log("获取表格命令执行结果:", result);
+            },
+          );
+
+          // 继续获取文档内容的现有逻辑...
+          editorRef.current.connector.callCommand(
             function () {
               try {
                 console.log("开始执行文档内容获取...");
