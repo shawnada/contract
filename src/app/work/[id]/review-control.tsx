@@ -151,37 +151,107 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
           try {
             var oDocument = Api.GetDocument();
 
-            // 第一种策略：精确匹配
+            // 第一步：尝试精确匹配
             var searchResults = oDocument.Search(Asc.scope.searchText);
+            if (searchResults && searchResults.length > 0) {
+              console.log(
+                "精确匹配成功，找到",
+                searchResults.length,
+                "处匹配位置",
+              );
+            }
 
-            // 如果精确匹配失败，使用第二种策略
+            // 如果精确匹配失败，使用优化的搜索策略
             if (!searchResults || searchResults.length === 0) {
-              console.log("精确匹配失败，尝试分段匹配...");
+              console.log("精确匹配失败，启动优化搜索策略");
 
-              // 将文本按换行符分割，并过滤掉空行
-              var lines = Asc.scope.searchText
-                .split("\n")
-                .map((line) => line.trim())
-                .filter((line) => line.length > 0);
+              // 1. 清理和规范化文本
+              var normalizedText = Asc.scope.searchText
+                .replace(/\s+/g, " ") // 将多个空白字符替换为单个空格
+                .trim();
 
-              // 按长度降序排序，优先匹配最长的行
-              lines.sort((a, b) => b.length - a.length);
+              // 2. 按不同分隔符分割文本
+              var segments = [
+                ...normalizedText.split(/\s+/), // 按空格分割
+                ...normalizedText.split(/[,，.。;；]/), // 按标点符号分割
+                ...(normalizedText.match(/[\u4e00-\u9fa5]+/g) || []), // 提取连续汉字
+                ...(normalizedText.match(/\d+/g) || []), // 提取连续数字
+              ]
+                .filter(Boolean) // 移除空值
+                .map((s) => s.trim()) // 清理首尾空格
+                .filter((s) => s.length > 1); // 过滤掉单字符
 
-              // 尝试匹配最长的非空行
-              for (var i = 0; i < lines.length; i++) {
-                searchResults = oDocument.Search(lines[i]);
+              // 3. 按长度降序排序
+              segments.sort((a, b) => b.length - a.length);
+
+              console.log("搜索片段:", segments);
+
+              // 4. 尝试搜索最长的片段
+              for (var i = 0; i < segments.length; i++) {
+                var segment = segments[i];
+                if (segment.length < 2) continue; // 跳过过短的片段
+
+                searchResults = oDocument.Search(segment);
                 if (searchResults && searchResults.length > 0) {
-                  console.log("找到匹配行:", lines[i]);
+                  console.log("找到匹配片段:", {
+                    segment: segment,
+                    originalText: Asc.scope.searchText,
+                    matchCount: searchResults.length,
+                    matchPositions: searchResults.map(
+                      (result: any, index: number) => ({
+                        position: index + 1,
+                        text: result.GetText(),
+                      }),
+                    ),
+                  });
                   break;
+                }
+              }
+
+              // 5. 如果还是没找到，尝试更激进的匹配策略
+              if (!searchResults || searchResults.length === 0) {
+                // 移除所有非中文字符后尝试匹配
+                var chineseOnly =
+                  normalizedText.match(/[\u4e00-\u9fa5]+/g) || [];
+                for (var chinese of chineseOnly) {
+                  if (chinese.length < 2) continue;
+                  searchResults = oDocument.Search(chinese);
+                  if (searchResults && searchResults.length > 0) {
+                    console.log("通过中文内容匹配成功:", {
+                      text: chinese,
+                      matchCount: searchResults.length,
+                      matchPositions: searchResults.map(
+                        (result: any, index: number) => ({
+                          position: index + 1,
+                          text: result.GetText(),
+                        }),
+                      ),
+                    });
+                    break;
+                  }
                 }
               }
             }
 
             if (!searchResults || searchResults.length === 0) {
-              console.warn("所有匹配策略都失败:", Asc.scope.searchText);
+              console.warn("所有搜索策略均失败:", {
+                originalText: Asc.scope.searchText,
+              });
               return { error: 1, msg: "未找到匹配文本" };
             }
 
+            // 如果找到多个匹配位置，记录日志
+            if (searchResults.length > 1) {
+              console.log("警告：找到多个匹配位置", {
+                count: searchResults.length,
+                positions: searchResults.map((result: any, index: number) => ({
+                  position: index + 1,
+                  text: result.GetText(),
+                })),
+              });
+            }
+
+            // 添加批注
             var oRange = searchResults[0];
             var oComments = Api.AddComment(
               oRange,
@@ -327,14 +397,21 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             return;
           }
 
+          // 使用 Asc.scope 来存储和传递数据
+          (window as any).Asc = {
+            scope: {
+              tableContents: [], // 存储表格内容
+              paragraphContent: [], // 存储段落内容
+              fullContent: "", // 存储最终合并的内容
+            },
+          };
+
           // 先获取表格内容
           editorRef.current.connector.callCommand(
             function () {
               try {
-                console.log("开始获取表格内容...");
                 var oDocument = Api.GetDocument();
                 var aTables = oDocument.GetAllTables();
-                console.log("文档中的表格数量:", aTables.length);
 
                 // 遍历所有表格
                 if (aTables && aTables.length > 0) {
@@ -346,52 +423,38 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
                     try {
                       var table = aTables[tableIndex];
                       var tableContent = [];
-
-                      // 获取表格行数
                       var rowsCount = table.GetRowsCount();
-                      console.log(`表格 ${tableIndex + 1} 的行数:`, rowsCount);
 
-                      // 遍历每一行
                       for (var row = 0; row < rowsCount; row++) {
                         var rowContent = [];
-                        // 获取当前行
                         var currentRow = table.GetRow(row);
-                        // 获取行中的单元格数量
                         var cellsCount = currentRow.GetCellsCount();
 
-                        // 遍历行中的每个单元格
                         for (var cell = 0; cell < cellsCount; cell++) {
                           try {
-                            // 获取单元格
                             var currentCell = currentRow.GetCell(cell);
-                            // 获取单元格内容
                             var paragraphs = currentCell
                               .GetContent()
                               .GetAllParagraphs();
                             var cellText = "";
 
-                            // 获取单元格中的所有段落文本
                             for (var p = 0; p < paragraphs.length; p++) {
-                              cellText += paragraphs[p].GetText() + "\n";
+                              cellText += paragraphs[p].GetText() + " ";
                             }
 
                             rowContent.push(cellText.trim());
                           } catch (cellError) {
-                            console.warn(
-                              `获取单元格内容失败 [${row}][${cell}]:`,
-                              cellError,
-                            );
                             rowContent.push("");
                           }
                         }
 
-                        tableContent.push(rowContent);
+                        tableContent.push(rowContent.join("\t")); // 使用制表符分隔单元格
                       }
 
-                      console.log(`表格 ${tableIndex + 1} 内容:`, {
-                        rowCount: rowsCount,
-                        content: tableContent,
-                      });
+                      // 使用 Asc.scope 存储表格内容
+                      Asc.scope.tableContents.push(
+                        `表格${tableIndex + 1}：\n${tableContent.join("\n")}\n`,
+                      );
                     } catch (tableError) {
                       console.error(
                         `处理表格 ${tableIndex + 1} 时出错:`,
@@ -399,91 +462,47 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
                       );
                     }
                   }
-                } else {
-                  console.log("文档中没有找到表格");
-                }
-              } catch (error) {
-                console.error("获取表格时出错:", error);
-              }
-            },
-            function (result) {
-              console.log("获取表格命令执行结果:", result);
-            },
-          );
-
-          // 继续获取文档内容的现有逻辑...
-          editorRef.current.connector.callCommand(
-            function () {
-              try {
-                console.log("开始执行文档内容获取...");
-                console.log("Api 对象:", typeof Api, Api ? "可用" : "不可用");
-
-                var oDocument = Api.GetDocument();
-                console.log("获取到文档对象:", oDocument ? "成功" : "失败");
-
-                if (!oDocument) {
-                  throw new Error("Failed to get document object");
                 }
 
-                var content = [];
+                // 获取段落内容
                 var eleCount = oDocument.GetElementsCount();
-
-                console.log("文档元素总数:", eleCount);
-
-                // 遍历并记录每个元素的信息
                 for (var i = 0; i < eleCount; i++) {
                   try {
                     var ele = oDocument.GetElement(i);
-                    var classType = ele.GetClassType();
-                    var text = "";
-
-                    try {
-                      text = ele.GetText ? ele.GetText() : "";
-                    } catch (textError) {
-                      console.warn(`获取元素 ${i} 文本失败:`, textError);
-                    }
-
-                    console.log(`元素 ${i + 1}:`, {
-                      type: classType,
-                      hasText: !!ele.GetText,
-                      text: text,
-                      length: text.length,
-                    });
-
-                    if (classType === "paragraph") {
-                      content.push(text);
+                    if (ele.GetClassType() === "paragraph") {
+                      var text = ele.GetText ? ele.GetText() : "";
+                      if (text.trim()) {
+                        Asc.scope.paragraphContent.push(text);
+                      }
                     }
                   } catch (elementError) {
                     console.warn(`处理元素 ${i} 时出错:`, elementError);
                   }
                 }
 
-                var fullText = content.join("\n");
-                console.log("成功合并文本");
-                return fullText;
-              } catch (innerError) {
-                console.error("文档内容获取过程出错:", innerError);
-                throw innerError;
+                // 合并所有内容
+                Asc.scope.fullContent = [
+                  ...Asc.scope.paragraphContent,
+                  "", // 添加空行分隔
+                  "表格内容：",
+                  ...Asc.scope.tableContents,
+                ].join("\n");
+
+                return Asc.scope.fullContent;
+              } catch (error) {
+                console.error("获取文档内容时出错:", error);
+                return "";
               }
             },
-            function (data, error) {
-              console.log("callCommand 回调被触发");
-              if (error) {
-                console.error("callCommand 回调报错:", error);
-                reject(error);
+            function (result) {
+              if (!result) {
+                reject(new Error("Failed to get document content"));
                 return;
               }
-
-              console.log("回调收到的文档内容:", {
-                type: typeof data,
-                length: data?.length || 0,
-                preview: data ? data.substring(0, 200) + "..." : "无内容",
-              });
-              resolve(data || "");
+              resolve(result);
             },
           );
         } catch (error) {
-          console.error("执行 callCommand 时发生错误:", error);
           reject(error);
         }
       });
@@ -610,14 +629,9 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
 
       console.log("所有规则审核完成");
     } catch (error) {
-      console.error("审核过程出错:", {
-        error: error,
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error("审核过程出错:", error);
       alert(`审核失败：${error.message || "请稍后重试"}`);
     } finally {
-      console.log("审核流程结束");
       setIsReviewing(false);
     }
   };

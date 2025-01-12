@@ -50,16 +50,25 @@ export async function POST(request: NextRequest) {
           "风险等级": "${rule.level}",
           "风险提示": "",
           "修改建议": ""
+        }，
+                {
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "${rule.level}",
+          "风险提示": "",
+          "修改建议": ""
         }
       ]
 
       要求：
       1. "是否找到风险"必须回答"是"或"否"
-      2. 必须准确指出"原文内容"，包含完整的金额表述
+      2. 必须准确指出"原文内容"，如果存在多处的，应当分别指出
       3. 严禁提示规则以外的风险
       4. "修改建议"必须可以直接替换原文
       5. 判断条款主要增加哪方风险（甲方/乙方/双方）
       6. 如果找不到相关风险，也要返回数组，但"是否找到风险"填"否"
+      8.同一条审核规则，可能在合同中出现多次，请仔细审核全文及表格内容，返回所有符合规则的风险
       7.除了json，不要返回任何其他内容
 
       合同全文内容：
@@ -69,8 +78,8 @@ export async function POST(request: NextRequest) {
       // 打印完整的提示词
       console.log("发送给 AI 律师的提示词:");
       console.log("----------------------------------------");
-      console.log(initialPrompt);
-      console.log("----------------------------------------");
+      // console.log(initialPrompt);
+      // console.log("----------------------------------------");
 
       const initialCompletion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -116,8 +125,8 @@ export async function POST(request: NextRequest) {
 
       console.log("发送给复查员的提示词:");
       console.log("----------------------------------------");
-      console.log(verificationPrompt);
-      console.log("----------------------------------------");
+      // console.log(verificationPrompt);
+      // console.log("----------------------------------------");
 
       const verificationCompletion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -126,7 +135,7 @@ export async function POST(request: NextRequest) {
 
       const verificationResponse =
         verificationCompletion.choices[0].message.content;
-      console.log("复查员返回结果:", verificationResponse);
+      // console.log("复查员返回结果:", verificationResponse);
 
       return Response.json({ result: verificationResponse });
     } catch (openaiError) {
