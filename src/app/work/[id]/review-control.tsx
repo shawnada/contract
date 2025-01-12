@@ -150,10 +150,35 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
         function () {
           try {
             var oDocument = Api.GetDocument();
+
+            // 第一种策略：精确匹配
             var searchResults = oDocument.Search(Asc.scope.searchText);
 
+            // 如果精确匹配失败，使用第二种策略
             if (!searchResults || searchResults.length === 0) {
-              console.warn("Text not found:", Asc.scope.searchText);
+              console.log("精确匹配失败，尝试分段匹配...");
+
+              // 将文本按换行符分割，并过滤掉空行
+              var lines = Asc.scope.searchText
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+
+              // 按长度降序排序，优先匹配最长的行
+              lines.sort((a, b) => b.length - a.length);
+
+              // 尝试匹配最长的非空行
+              for (var i = 0; i < lines.length; i++) {
+                searchResults = oDocument.Search(lines[i]);
+                if (searchResults && searchResults.length > 0) {
+                  console.log("找到匹配行:", lines[i]);
+                  break;
+                }
+              }
+            }
+
+            if (!searchResults || searchResults.length === 0) {
+              console.warn("所有匹配策略都失败:", Asc.scope.searchText);
               return { error: 1, msg: "未找到匹配文本" };
             }
 

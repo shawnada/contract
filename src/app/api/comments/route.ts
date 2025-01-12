@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUserInfo } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
+    const user = await getUserInfo();
+    if (!user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { documentId, comment } = body;
 
@@ -28,7 +34,7 @@ export async function POST(request: Request) {
         documentCommentId: comment.documentCommentId,
         isLocated: comment.isLocated,
         documentId: documentId,
-        userId: "cm5g5e9sa0000mmzyb5dt4m4f",
+        userId: user.id,
       },
     });
 
