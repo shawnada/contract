@@ -107,7 +107,11 @@ export default function OnlyOfficeEditor({
                 autosave: false,
                 forcesave: true,
                 chat: false,
-                comments: false,
+                comments: {
+                  showDeleteButton: true,
+                  editAuthorOnly: false,
+                  removeAuthorOnly: false,
+                },
                 compactToolbar: false,
                 feedback: false,
                 help: false,
