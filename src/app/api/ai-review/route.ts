@@ -13,87 +13,142 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { rules, mainText } = await request.json();
+    const body = await request.json();
+    const { rule, mainText } = body;
 
-    // 第一步：获取初始审核结果
-    const initialPrompt = `你是"重庆中联信息产业有限责任公司"的律师，这是一家医疗软件公司，请按照《审核标准》进行审核，内容如下：
-    要求：
-    1. 严格根据我提供的《审核标准》进行审核，禁止提示《审核标准》以外的风险，内容如下：
-    ${JSON.stringify(rules, null, 2)}
-    
-    2. 这份合同的内容如下：
-    ${mainText}
-    
-    3.“是否找到风险”必须回答，如果找到风险，应当在结果中回答“是”，如果没找到相关风险，应当回答“否”，
-    4.你必须准确的指出"原文内容"，以便于我定位条款的位置
-    5.严禁提示《审核标准》以外的风险
-    6."修改建议"必须是可以用于一键替换"原文内容"的，具体的条款写法
-    7. 你需要判断合同中，与审核规则相关的条款主要增加的是哪一方的风险，请在"主要增加哪方风险"中回答，
-    8.返回严格的JSON格式数组，格式如下案例：
-    [
-      {
-        "是否找到风险": "是",  
-        "重庆中联信息产业有限责任公司是哪方": "乙方",
-        "主要增加哪方的风险": "乙方",
-        "原文": "违约金为合同总价的50%",
-        "风险等级": "高",
-        "风险提示": "违约金过高，超过合同总价的30%",
-        "修改建议": "违约金不超过造成损失的30%"
-      }
-    ]
-    请严格按照这个JSON格式返回，不要添加其他内容，确保可以被 JSON.parse() 正确解析。
-    `;
+    if (!rule || !mainText) {
+      return Response.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
+    }
 
-    const initialCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: initialPrompt }],
-    });
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OpenAI API key not configured");
+      return Response.json(
+        { error: "OpenAI configuration missing" },
+        { status: 500 },
+      );
+    }
 
-    const initialResponse = initialCompletion.choices[0].message.content;
+    try {
+      const initialPrompt = `
+      你是一名专业的合同审核律师，请根据以下规则审查合同中是否存在风险：
 
-    // 第二步：验证和过滤结果
-    const verificationPrompt = `作为审核员，请检查AI返回的审核结果是否严格符合规则要求。
+      规则信息：
+      - 类别: ${rule.category}
+      - 风险等级: ${rule.level}
+      - 审核原则: ${rule.principle}
+      ${rule.clause ? `- 相关条款: ${rule.clause}` : ""}
 
-    1. 本次审核标准规则如下：
-    ${JSON.stringify(rules, null, 2)}
+      请检查合同中是否存在此类风险。你必须返回严格的JSON格式数组，格式如下：
+      [
+        {
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "${rule.level}",
+          "风险提示": "",
+          "修改建议": ""
+        }，
+                {
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "${rule.level}",
+          "风险提示": "",
+          "修改建议": ""
+        }
+      ]
 
-    2. AI返回的审核结果如下：
-    ${initialResponse}
+      要求：
+      1. "是否找到风险"必须回答"是"或"否"
+      2. 必须准确指出"原文内容"，如果存在多处的，应当分别指出
+      3. 严禁提示规则以外的风险
+      4. "修改建议"必须可以直接替换原文
+      5. 判断条款主要增加哪方风险（甲方/乙方/双方）
+      6. 如果找不到相关风险，也要返回数组，但"是否找到风险"填"否"
+      8.同一条审核规则，可能在合同中出现多次，请仔细审核全文及表格内容，返回所有符合规则的风险
+      7.除了json，不要返回任何其他内容
 
-    请执行以下检查：
-    1. 如果AI返回的审核结果，与审核规则并不相关，请回答“否”
-    2. 如果"重庆中联信息产业有限责任公司是哪方"和"主要增加哪方的风险"一致，则在"是否增加我方的风险"请回答“是”，否则回答“否”
-    3. 确保风险等级与规则中的定义一致
-    4. 返回过滤后的JSON数组如下：
-    [
-      {
-        "是否找到风险": "是",  
-        "重庆中联信息产业有限责任公司是哪方": "乙方",
-        "主要增加哪方的风险": "乙方",
-        "原文": "违约金为合同总价的50%",
-        "风险等级": "高",
-        "风险提示": "违约金过高，超过合同总价的30%",
-        "修改建议": "违约金不超过造成损失的30%"
-        "是否与规则相关": "是"
-        "是否增加我方的风险": "是"
-      }
-    ]
-    
-    只返回过滤后的JSON数组，不要包含任何其他解释或评论。`;
+      合同全文内容：
+      ${mainText}
+      `;
 
-    const verificationCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: verificationPrompt }],
-    });
+      // 打印完整的提示词
+      console.log("发送给 AI 律师的提示词:");
+      console.log("----------------------------------------");
+      // console.log(initialPrompt);
+      // console.log("----------------------------------------");
 
-    const verificationResponse =
-      verificationCompletion.choices[0].message.content;
+      const initialCompletion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: initialPrompt }],
+      });
 
-    return Response.json({ result: verificationResponse });
+      const initialResponse = initialCompletion.choices[0].message.content;
+      console.log("AI律师回答:", initialResponse);
+
+      // 打印验证提示词
+      const verificationPrompt = `
+      1.作为复查员，请严格检查AI律师返回的结果的格式是否为json格式，我们的格式示例为：
+      [
+        {
+          "是否找到风险": "",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "",
+          "风险提示": "",
+          "修改建议": ""
+        }
+      ]
+      2.是否除了json，没有返回任何其他任何多余内容
+      3.json中，如果"风险等级"的值为空，是符合规则的，并未要求必须填写
+      3.AI律师返回结果：
+      ${initialResponse}
+      4.你返回的结果应当在AI律师返回结果的基础上，增加"是否符合要求"和"不符合原因"两个字段
+      5.如果AI律师返回的结果格式错误，请在"是否符合要求"中填"否"，并写明"不符合原因"，否则填"是"
+      6.你应当返回的格式如下：
+      [
+        {
+          "是否找到风险": "是",  
+          "主要增加哪方的风险": "",
+          "原文": "",
+          "风险等级": "",
+          "风险提示": "",
+          "修改建议": ""
+          "是否符合要求": "",
+          "不符合原因": ""
+        }
+      ]
+      `;
+
+      console.log("发送给复查员的提示词:");
+      console.log("----------------------------------------");
+      // console.log(verificationPrompt);
+      // console.log("----------------------------------------");
+
+      const verificationCompletion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: verificationPrompt }],
+      });
+
+      const verificationResponse =
+        verificationCompletion.choices[0].message.content;
+      // console.log("复查员返回结果:", verificationResponse);
+
+      return Response.json({ result: verificationResponse });
+    } catch (openaiError) {
+      console.error("OpenAI API error:", openaiError);
+      return Response.json(
+        { error: "AI service error", details: openaiError.message },
+        { status: 500 },
+      );
+    }
   } catch (error) {
-    console.error("AI Review Error:", error);
+    console.error("API route error:", error);
     return Response.json(
-      { error: "Failed to process AI review" },
+      { error: "Internal server error", details: error.message },
       { status: 500 },
     );
   }

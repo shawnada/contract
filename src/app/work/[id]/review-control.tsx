@@ -13,6 +13,7 @@ import { getStandards } from "../api/standards";
 import { useEditorContext } from "./editor-context";
 import "./review-control.css";
 import { X } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 interface Standard {
   id: string;
@@ -66,6 +67,75 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     currentRule?: string;
   }>({ current: 0, total: 0 });
   const [comments, setComments] = useState<Comment[]>([]);
+  const [isAiReviewing, setIsAiReviewing] = useState(false);
+
+  // 移动 parseAIResponse 到组件内部
+  const parseAIResponse = async (response: any): Promise<any[]> => {
+    let result;
+    try {
+      // 检查是否是包含 result 字段的对象
+      if (response.result) {
+        // 清理 markdown 代码块标记和非法字符
+        const cleanedResult = response.result
+          .replace(/```json\n?/g, "") // 移除开始的 ```json
+          .replace(/```\n?/g, "") // 移除结束的 ```
+          .trim(); // 移除多余的空白
+
+        console.log("清理后的结果:", cleanedResult);
+
+        try {
+          // 首先尝试直接解析
+          result = JSON.parse(cleanedResult);
+        } catch (firstError) {
+          try {
+            // 如果直接解析失败，尝试预处理 JSON 字符串
+            const preprocessed = cleanedResult
+              .replace(/\t/g, " ") // 将制表符替换为空格
+              .replace(/\r?\n/g, "\\n") // 处理换行符
+              .replace(/\s+/g, " ") // 合并多个空格
+              .replace(/\\/g, "\\\\") // 处理反斜杠
+              .replace(/\\\\n/g, "\\n") // 修复双重转义的换行符
+              .replace(/\\"/g, '\\"') // 处理引号
+              .trim();
+
+            result = JSON.parse(preprocessed);
+          } catch (secondError) {
+            // 如果还是失败，尝试最后的方案
+            try {
+              // 使用 eval 作为最后的手段（注意：这可能有安全风险）
+              const evalResult = eval("(" + cleanedResult + ")");
+              if (Array.isArray(evalResult)) {
+                result = evalResult;
+              } else {
+                throw new Error("Eval result is not an array");
+              }
+            } catch (evalError) {
+              console.error("所有解析方法都失败:", {
+                firstError,
+                secondError,
+                evalError,
+                cleanedResult,
+              });
+              throw evalError;
+            }
+          }
+        }
+      } else {
+        // 如果直接是数组
+        result = response;
+      }
+
+      if (!Array.isArray(result)) {
+        console.warn("解析结果不是数组:", result);
+        return [];
+      }
+
+      return result;
+    } catch (error) {
+      console.error("解析 AI 响应失败:", error);
+      throw new Error("Failed to parse AI response");
+    }
+  };
 
   useEffect(() => {
     // 获取标准列表
@@ -240,30 +310,23 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
               return { error: 1, msg: "未找到匹配文本" };
             }
 
-            // 如果找到多个匹配位置，记录日志
-            if (searchResults.length > 1) {
-              console.log("警告：找到多个匹配位置", {
-                count: searchResults.length,
-                positions: searchResults.map((result: any, index: number) => ({
-                  position: index + 1,
-                  text: result.GetText(),
-                })),
-              });
+            // 为每个匹配位置添加批注
+            const commentIds = [];
+            for (var i = 0; i < searchResults.length; i++) {
+              var oRange = searchResults[i];
+              var oComments = Api.AddComment(
+                oRange,
+                Asc.scope.commentContent,
+                "AI审核",
+                "ai-review",
+              );
+              commentIds.push(oComments.Comment.Id);
             }
-
-            // 添加批注
-            var oRange = searchResults[0];
-            var oComments = Api.AddComment(
-              oRange,
-              Asc.scope.commentContent,
-              "AI审核",
-              "ai-review",
-            );
 
             return {
               error: 0,
-              data: oComments.Comment.Id,
-              msg: "批注添加成功",
+              data: commentIds,
+              msg: `成功添加 ${commentIds.length} 条批注`,
             };
           } catch (error) {
             console.error("添加批注时出错:", error);
@@ -321,12 +384,9 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     autoExpand?: boolean;
   }) => {
     try {
-      // 使用 generateUUID 替代 crypto.randomUUID
       const commentGroupId = groupId || generateUUID();
-
-      // 创建新的批注对象
       const newComment: Comment = {
-        id: generateUUID(), // 这里也使用 generateUUID
+        id: generateUUID(),
         guid: commentGroupId,
         content,
         additionalContent,
@@ -338,43 +398,80 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
       };
 
       try {
-        // 构建批注内容，使用零宽空格隐藏 GUID
         const commentContent =
-          `\u200B[GUID:${commentGroupId}]\u200B` + // 使用零宽空格包裹 GUID
+          `\u200B[GUID:${commentGroupId}]\u200B` +
           `风险等级：${newComment.riskLevel}\n` +
           `风险提示：${newComment.content}\n` +
           `修改建议：${newComment.additionalContent || "无"}`;
 
-        // 在文档中添加批注
-        const documentCommentId = await addCommentToDocument(
+        // 获取所有匹配位置的批注 ID
+        const documentCommentIds = await addCommentToDocument(
           newComment.rangeText,
           commentContent,
         );
 
-        newComment.documentCommentId = documentCommentId;
-        newComment.isLocated = true;
+        // 如果是数组，说明有多个匹配位置
+        if (Array.isArray(documentCommentIds)) {
+          // 为每个匹配位置创建一个批注记录
+          const comments = documentCommentIds.map((documentCommentId) => ({
+            ...newComment,
+            id: generateUUID(), // 每个批注都需要新的 ID
+            documentCommentId,
+            isLocated: true,
+          }));
 
-        // 保存到数据库
-        const response = await fetch("/api/comments", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            documentId: docId,
-            comment: newComment,
-          }),
-        });
+          try {
+            // 批量保存到数据库
+            const response = await fetch("/api/comments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                documentId: docId,
+                comments, // 发送批注数组
+              }),
+            });
 
-        if (!response.ok) {
-          throw new Error("Failed to save comment");
+            if (!response.ok) {
+              const errorData = await response.json();
+              // 如果是重复评论错误，我们可以继续处理
+              if (response.status === 409) {
+                console.warn("部分评论可能已存在:", errorData);
+                // 可以选择继续处理或者提示用户
+              } else {
+                throw new Error(
+                  `Failed to save comments: ${errorData.details || response.statusText}`,
+                );
+              }
+            }
+
+            const savedComments = await response.json();
+            setComments((prevComments) => [...prevComments, ...savedComments]);
+
+            return {
+              groupId: commentGroupId,
+              commentIds: savedComments.map((c: Comment) => c.id),
+            };
+          } catch (error) {
+            // 如果保存失败，删除已添加的文档批注
+            if (editorRef.current?.connector) {
+              try {
+                await new Promise((resolve) => {
+                  editorRef.current.connector.executeMethod(
+                    "RemoveComments",
+                    [documentCommentIds],
+                    resolve,
+                  );
+                });
+              } catch (removeError) {
+                console.error(
+                  "Failed to remove document comments:",
+                  removeError,
+                );
+              }
+            }
+            throw error;
+          }
         }
-
-        const savedComment = await response.json();
-        setComments((prevComments) => [...prevComments, savedComment]);
-
-        return {
-          groupId: commentGroupId,
-          // ... 其他返回值 ...
-        };
       } catch (error) {
         console.error("创建批注失败:", error);
         setComments((prevComments) => [...prevComments, newComment]);
@@ -573,29 +670,8 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
           const response = await aiResponse.json();
           console.log("收到原始 AI 响应:", response);
 
-          // 解析 JSON 字符串
-          let result;
-          try {
-            // 检查是否是包含 result 字段的对象
-            if (response.result) {
-              // 清理 markdown 代码块标记
-              const cleanedResult = response.result
-                .replace(/```json\n?/g, "") // 移除开始的 ```json
-                .replace(/```\n?/g, "") // 移除结束的 ```
-                .trim(); // 移除多余的空白
-
-              result = JSON.parse(cleanedResult);
-              console.log("解析后的 AI 响应:", result);
-            } else {
-              // 如果直接是数组
-              result = response;
-            }
-          } catch (parseError) {
-            console.error("解析 AI 响应失败:", parseError);
-            throw new Error("Failed to parse AI response");
-          }
-
-          // 处理返回的结果数组
+          // 处理返回的结果
+          const result = await parseAIResponse(response);
           if (Array.isArray(result)) {
             console.log("开始处理 AI 返回结果:", result);
             for (const item of result) {
@@ -616,8 +692,6 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
                 console.log("批注创建成功");
               }
             }
-          } else {
-            console.warn("AI 返回结果不是数组:", result);
           }
 
           // 继续处理下一条规则
@@ -739,6 +813,217 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     }
   };
 
+  const handleAiReview = async () => {
+    if (!selectedStandard) return;
+
+    setIsAiReviewing(true);
+    try {
+      const mainText = await getDocumentContent();
+      const standard = standards.find((s) => s.id === selectedStandard);
+      if (!standard) return;
+
+      // 获取规则列表
+      const rules = await getRules(standard.id);
+      if (!rules || rules.length === 0) {
+        toast.error("未找到审核规则");
+        return;
+      }
+
+      // 设置进度信息
+      setReviewProgress({
+        current: 0,
+        total: rules.length,
+        currentRule: "",
+      });
+
+      // 逐条审核规则
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        setReviewProgress({
+          current: i + 1,
+          total: rules.length,
+          currentRule: rule.title || "",
+        });
+
+        try {
+          const response = await fetch("/api/ai-review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rule, mainText }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await parseAIResponse(await response.json());
+          if (Array.isArray(result)) {
+            for (const item of result) {
+              if (item.是否找到风险 === "是" && item.原文) {
+                console.log("发现风险项:", item);
+                await createComment({
+                  content: `${item.风险提示}${
+                    item.主要增加哪方的风险
+                      ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                      : ""
+                  }`,
+                  additionalContent: item.修改建议,
+                  riskLevel: item.风险等级 as "高" | "中" | "低",
+                  userName: "System",
+                  rangeText: item.原文,
+                  autoExpand: false,
+                });
+                console.log("批注创建成功");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("规则审核失败:", error);
+          toast.error(`规则 "${rule.title}" 审核失败`);
+        }
+      }
+
+      toast.success("审核完成");
+    } catch (error) {
+      console.error("审核过程出错:", error);
+      toast.error("审核过程出错");
+    } finally {
+      setIsAiReviewing(false);
+      setReviewProgress({
+        current: 0,
+        total: 0,
+        currentRule: "",
+      });
+    }
+  };
+
+  const getDocumentContent = async () => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!editorRef.current?.connector) {
+          reject(new Error("Editor connector not initialized"));
+          return;
+        }
+
+        // 使用 Asc.scope 来存储和传递数据
+        (window as any).Asc = {
+          scope: {
+            tableContents: [], // 存储表格内容
+            paragraphContent: [], // 存储段落内容
+            fullContent: "", // 存储最终合并的内容
+          },
+        };
+
+        // 获取文档内容
+        editorRef.current.connector.callCommand(
+          function () {
+            try {
+              var oDocument = Api.GetDocument();
+              var aTables = oDocument.GetAllTables();
+
+              // 遍历所有表格
+              if (aTables && aTables.length > 0) {
+                for (
+                  var tableIndex = 0;
+                  tableIndex < aTables.length;
+                  tableIndex++
+                ) {
+                  try {
+                    var table = aTables[tableIndex];
+                    var tableContent = [];
+                    var rowsCount = table.GetRowsCount();
+
+                    for (var row = 0; row < rowsCount; row++) {
+                      var rowContent = [];
+                      var currentRow = table.GetRow(row);
+                      var cellsCount = currentRow.GetCellsCount();
+
+                      for (var cell = 0; cell < cellsCount; cell++) {
+                        try {
+                          var currentCell = currentRow.GetCell(cell);
+                          var paragraphs = currentCell
+                            .GetContent()
+                            .GetAllParagraphs();
+                          var cellText = "";
+
+                          for (var p = 0; p < paragraphs.length; p++) {
+                            cellText += paragraphs[p].GetText() + " ";
+                          }
+
+                          rowContent.push(cellText.trim());
+                        } catch (cellError) {
+                          rowContent.push("");
+                        }
+                      }
+
+                      tableContent.push(rowContent.join("\t")); // 使用制表符分隔单元格
+                    }
+
+                    // 使用 Asc.scope 存储表格内容
+                    Asc.scope.tableContents.push(
+                      `表格${tableIndex + 1}：\n${tableContent.join("\n")}\n`,
+                    );
+                  } catch (tableError) {
+                    console.error(
+                      `处理表格 ${tableIndex + 1} 时出错:`,
+                      tableError,
+                    );
+                  }
+                }
+              }
+
+              // 获取段落内容
+              var eleCount = oDocument.GetElementsCount();
+              for (var i = 0; i < eleCount; i++) {
+                try {
+                  var ele = oDocument.GetElement(i);
+                  if (ele.GetClassType() === "paragraph") {
+                    var text = ele.GetText ? ele.GetText() : "";
+                    if (text.trim()) {
+                      Asc.scope.paragraphContent.push(text);
+                    }
+                  }
+                } catch (elementError) {
+                  console.warn(`处理元素 ${i} 时出错:`, elementError);
+                }
+              }
+
+              // 合并所有内容
+              Asc.scope.fullContent = [
+                ...Asc.scope.paragraphContent,
+                "", // 添加空行分隔
+                "表格内容：",
+                ...Asc.scope.tableContents,
+              ].join("\n");
+
+              return Asc.scope.fullContent;
+            } catch (error) {
+              console.error("获取文档内容时出错:", error);
+              return "";
+            }
+          },
+          function (result) {
+            if (!result) {
+              reject(new Error("Failed to get document content"));
+              return;
+            }
+            resolve(result);
+          },
+        );
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  const getRules = async (standardId: string) => {
+    const response = await fetch(`/api/rules?standardId=${standardId}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch rules");
+    }
+    return response.json();
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-none space-y-4">
@@ -762,13 +1047,21 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             className="bg-primary text-white hover:bg-primary/90"
             disabled={!selectedStandard || isReviewing}
           >
-            {isReviewing ? "审核中..." : "严格审核"}
+            {isReviewing ? "审核中..." : "合同审核"}
+          </Button>
+
+          <Button
+            onClick={handleAiReview}
+            className="bg-primary text-white hover:bg-primary/90"
+            disabled={!selectedStandard || isAiReviewing}
+          >
+            {isAiReviewing ? "审核中..." : "合同审核(复制)"}
           </Button>
         </div>
 
         {/* 进度条 */}
         <div className="text-sm text-gray-500">
-          {isReviewing ? (
+          {isReviewing || isAiReviewing ? (
             <>
               正在审核 ({reviewProgress.current}/{reviewProgress.total}):
               {reviewProgress.currentRule}
@@ -780,9 +1073,10 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             <div
               className="bg-primary h-full rounded-full transition-all"
               style={{
-                width: isReviewing
-                  ? `${(reviewProgress.current / reviewProgress.total) * 100}%`
-                  : "0%",
+                width:
+                  isReviewing || isAiReviewing
+                    ? `${(reviewProgress.current / reviewProgress.total) * 100}%`
+                    : "0%",
               }}
             />
           </div>
