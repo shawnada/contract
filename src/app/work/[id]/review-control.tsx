@@ -384,7 +384,7 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     autoExpand?: boolean;
   }) => {
     try {
-      const commentGroupId = groupId || generateUUID();
+      const commentGroupId = generateUUID();
       const newComment: Comment = {
         id: generateUUID(),
         guid: commentGroupId,
@@ -1055,7 +1055,7 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
             className="bg-primary text-white hover:bg-primary/90"
             disabled={!selectedStandard || isAiReviewing}
           >
-            {isAiReviewing ? "审核中..." : "合同审核(复制)"}
+            {isAiReviewing ? "审核中..." : "测试"}
           </Button>
         </div>
 

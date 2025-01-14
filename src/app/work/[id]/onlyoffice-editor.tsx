@@ -361,6 +361,22 @@ export default function OnlyOfficeEditor({
                     });
 
                     // 匹配批注
+                    const findMatchingDocComment = (dbGuid: string) => {
+                      // 移除可能的索引后缀（如 _0）
+                      const cleanDbGuid = dbGuid.split("_")[0];
+
+                      return docComments.find((docComment) => {
+                        const docGuid = docComment.guid;
+                        console.log("Comparing GUIDs:", {
+                          dbGuid,
+                          cleanDbGuid,
+                          docGuid,
+                          matches: docGuid === cleanDbGuid,
+                        });
+                        return docGuid === cleanDbGuid;
+                      });
+                    };
+
                     for (const dbComment of dbComments) {
                       console.log("Processing database comment:", {
                         id: dbComment.id,
@@ -369,16 +385,8 @@ export default function OnlyOfficeEditor({
                         documentCommentId: dbComment.documentCommentId,
                       });
 
-                      const matchingDocComment = docComments.find(
-                        (docComment) => {
-                          const matches = docComment.guid === dbComment.guid;
-                          console.log("Comparing GUIDs:", {
-                            dbGuid: dbComment.guid,
-                            docGuid: docComment.guid,
-                            matches,
-                          });
-                          return matches;
-                        },
+                      const matchingDocComment = findMatchingDocComment(
+                        dbComment.guid,
                       );
 
                       if (matchingDocComment) {

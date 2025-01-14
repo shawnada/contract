@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const initialPrompt = `
-      你是一名专业的合同审核律师，请根据以下规则审查合同中是否存在风险：
+      你是一名专业的病历审核人员，请根据以下规则审查病历是否不符合要求：
 
       规则信息：
       - 类别: ${rule.category}
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       - 审核原则: ${rule.principle}
       ${rule.clause ? `- 相关条款: ${rule.clause}` : ""}
 
-      请检查合同中是否存在此类风险。你必须返回严格的JSON格式数组，格式如下：
+      请检查病历书写中是否存在此类风险。你必须返回严格的JSON格式数组，格式如下：
       [
         {
           "是否找到风险": "",  
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       2. 必须准确指出"原文内容"，如果存在多处的，应当分别指出
       3. 严禁提示规则以外的风险
       4. "修改建议"必须可以直接替换原文
-      5. 判断条款主要增加哪方风险（甲方/乙方/双方）
+      5. 判断条款主要增加哪方风险（院方/患者）
       6. 如果找不到相关风险，也要返回数组，但"是否找到风险"填"否"
       8.同一条审核规则，可能在合同中出现多次，请仔细审核全文及表格内容，返回所有符合规则的风险
       7.除了json，不要返回任何其他内容
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       `;
 
       // 打印完整的提示词
-      console.log("发送给 AI 律师的提示词:");
+      console.log("发送给 AI 质控师的提示词:");
       console.log("----------------------------------------");
       // console.log(initialPrompt);
       // console.log("----------------------------------------");
@@ -87,11 +87,11 @@ export async function POST(request: NextRequest) {
       });
 
       const initialResponse = initialCompletion.choices[0].message.content;
-      console.log("AI律师回答:", initialResponse);
+      console.log("AI质控师回答:", initialResponse);
 
       // 打印验证提示词
       const verificationPrompt = `
-      1.作为复查员，请严格检查AI律师返回的结果的格式是否为json格式，我们的格式示例为：
+      1.你是“肛肠科”的病历质控检察院，熟悉肛肠科的病历书写，请严格检查AI质控师返回的结果的格式是否为json格式，我们的格式示例为：
       [
         {
           "是否找到风险": "",  
@@ -104,10 +104,10 @@ export async function POST(request: NextRequest) {
       ]
       2.是否除了json，没有返回任何其他任何多余内容
       3.json中，如果"风险等级"的值为空，是符合规则的，并未要求必须填写
-      3.AI律师返回结果：
+      3.AI质控师返回结果：
       ${initialResponse}
-      4.你返回的结果应当在AI律师返回结果的基础上，增加"是否符合要求"和"不符合原因"两个字段
-      5.如果AI律师返回的结果格式错误，请在"是否符合要求"中填"否"，并写明"不符合原因"，否则填"是"
+      4.你返回的结果应当在AI质控师返回结果的基础上，增加"是否符合要求"和"不符合原因"两个字段
+      5.如果AI质控师返回的结果格式错误，请在"是否符合要求"中填"否"，并写明"不符合原因"，否则填"是"
       6.你应当返回的格式如下：
       [
         {

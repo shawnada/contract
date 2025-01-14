@@ -31,9 +31,9 @@ export async function POST(request: Request) {
       try {
         console.log("开始批量创建评论, 数据:", comments);
 
-        // 验证评论数据并确保 guid 唯一
-        const validComments = comments.map((comment, index) => ({
-          guid: `${comment.guid}_${index}`, // 确保每个评论的 guid 唯一
+        // 验证评论数据，保持原始 GUID
+        const validComments = comments.map((comment) => ({
+          guid: comment.guid, // 不再添加索引后缀
           content: comment.content,
           additionalContent: comment.additionalContent,
           riskLevel: comment.riskLevel,
