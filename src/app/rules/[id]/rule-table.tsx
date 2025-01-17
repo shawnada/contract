@@ -14,6 +14,14 @@ import { Plus, Trash2, Download, Upload, ArrowUpDown } from "lucide-react";
 import debounce from "lodash.debounce";
 import { createRule, updateRule, deleteRule } from "./action";
 import * as XLSX from "xlsx";
+import { Rule as PrismaRule } from "@prisma/client";
+
+interface RuleTableProps {
+  rules: PrismaRule[];
+  standardId: string;
+  userName: string;
+  standardTitle: string;
+}
 
 interface Rule {
   id: string;
@@ -41,12 +49,7 @@ export default function RuleTable({
   standardId,
   userName,
   standardTitle,
-}: {
-  rules: Rule[];
-  standardId: string;
-  userName: string;
-  standardTitle: string;
-}) {
+}: RuleTableProps) {
   const [data, setData] = useState<Rule[]>(rules);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");

@@ -3,6 +3,9 @@ import Title from "./title";
 import RuleTable from "./rule-table";
 import { redirect } from "next/navigation";
 import { getUserInfo } from "@/lib/session";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export default async function StandardPage({
   params,
@@ -17,7 +20,21 @@ export default async function StandardPage({
     }
 
     // 获取标准
-    const standard = await getStandard(params.id);
+    const standard = await prisma.standard.findUnique({
+      where: { id: params.id },
+      include: {
+        rules: {
+          orderBy: {
+            createdAt: "asc", // 只按创建时间排序
+          },
+        },
+        user: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
 
     // 如果标准不存在，重定向到 rules 首页
     if (!standard) {
