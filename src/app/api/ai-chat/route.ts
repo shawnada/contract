@@ -10,14 +10,21 @@ const openai = new OpenAI({
 export async function POST(request: Request) {
   console.log("Received /api/ai-chat request");
   try {
-    // 从请求体中获取 messages 数组，并仅使用最新的用户消息（避免上下文过长）
+    // 从请求体中获取 messages 数组，并取最近5轮对话（5轮=10条消息），如果有系统提示则保留
     const { messages } = await request.json();
-    const lastMessage = messages[messages.length - 1];
-    console.log("Received message:", lastMessage);
+    let recentMessages: any[] = [];
+    if (messages.length > 0 && messages[0].role === "system") {
+      const systemMsg = messages[0];
+      const conversation = messages.slice(1);
+      recentMessages = [systemMsg, ...conversation.slice(-10)];
+    } else {
+      recentMessages = messages.slice(-10);
+    }
+    console.log("Using recentMessages:", recentMessages);
 
     // 请求时设置 stream: true
     const completion = await openai.chat.completions.create({
-      messages: [lastMessage],
+      messages: recentMessages,
       model: "deepseek-ai/DeepSeek-R1",
       stream: true,
     });

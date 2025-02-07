@@ -7,6 +7,11 @@ interface Message {
   content: string;
 }
 
+interface MessageSegment {
+  type: "think" | "content" | "title" | "list";
+  text: string;
+}
+
 export default function AIChatPage() {
   // 初始包含系统提示
   const [messages, setMessages] = useState<Message[]>([
@@ -77,6 +82,113 @@ export default function AIChatPage() {
     setLoading(false);
   };
 
+  const parseMessage = (content: string): MessageSegment[] => {
+    const segments: MessageSegment[] = [];
+
+    // 解析 <think> 标签
+    const thinkMatch = content.match(/<think>(.*?)<\/think>/s);
+    if (thinkMatch) {
+      segments.push({ type: "think", text: thinkMatch[1].trim() });
+      content = content.replace(thinkMatch[0], "");
+    }
+
+    // 解析标题（以 ### 开头的行）
+    content.split("\n").forEach((line) => {
+      if (line.startsWith("### ")) {
+        segments.push({ type: "title", text: line.replace("### ", "") });
+      } else if (line.startsWith("- ")) {
+        segments.push({ type: "list", text: line.substring(2) });
+      } else if (line.trim()) {
+        segments.push({ type: "content", text: line });
+      }
+    });
+
+    return segments;
+  };
+
+  const MessageContent = ({ content }: { content: string }) => {
+    const segments = parseMessage(content);
+
+    return (
+      <div className="message-content">
+        {segments.map((segment, index) => {
+          switch (segment.type) {
+            case "think":
+              return (
+                <div
+                  key={index}
+                  className="think-segment"
+                  style={{
+                    backgroundColor: "#f5f5f5",
+                    padding: "12px",
+                    margin: "8px 0",
+                    borderLeft: "4px solid #9e9e9e",
+                    fontFamily: "Georgia, serif",
+                    fontSize: "0.95em",
+                    color: "#666",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontStyle: "italic",
+                      marginBottom: "4px",
+                      color: "#888",
+                    }}
+                  >
+                    思考过程:
+                  </div>
+                  {segment.text}
+                </div>
+              );
+
+            case "title":
+              return (
+                <h3
+                  key={index}
+                  style={{
+                    fontSize: "1.2em",
+                    fontWeight: "bold",
+                    margin: "16px 0 8px 0",
+                    color: "#2c3e50",
+                  }}
+                >
+                  {segment.text}
+                </h3>
+              );
+
+            case "list":
+              return (
+                <div
+                  key={index}
+                  style={{
+                    margin: "4px 0",
+                    paddingLeft: "20px",
+                    position: "relative",
+                  }}
+                >
+                  <span style={{ position: "absolute", left: "8px" }}>•</span>
+                  {segment.text}
+                </div>
+              );
+
+            default:
+              return (
+                <p
+                  key={index}
+                  style={{
+                    margin: "8px 0",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  {segment.text}
+                </p>
+              );
+          }
+        })}
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
       <h1>AI 聊天</h1>
@@ -86,7 +198,7 @@ export default function AIChatPage() {
           border: "1px solid #ccc",
           borderRadius: "8px",
           padding: "1rem",
-          height: "60vh",
+          height: "75vh",
           overflowY: "auto",
           marginBottom: "1rem",
           background: "#f9f9f9",
@@ -114,7 +226,11 @@ export default function AIChatPage() {
                 }}
               >
                 <strong>{msg.role === "user" ? "你" : "AI"}</strong>:{" "}
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <MessageContent content={msg.content} />
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
           ))}
@@ -127,7 +243,7 @@ export default function AIChatPage() {
       </div>
       {/* 输入区域 */}
       <div style={{ display: "flex" }}>
-        <input
+        <textarea
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -138,6 +254,13 @@ export default function AIChatPage() {
             fontSize: "1rem",
             border: "1px solid #ccc",
             borderRadius: "4px",
+            resize: "none",
+            height: "100px",
+            minHeight: "80px",
+            maxHeight: "200px",
+            overflowY: "auto",
+            lineHeight: "1.5",
+            fontFamily: "inherit",
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -160,6 +283,8 @@ export default function AIChatPage() {
             backgroundColor: "#0070f3",
             color: "#fff",
             cursor: "pointer",
+            alignSelf: "flex-end",
+            height: "40px",
           }}
         >
           发送
