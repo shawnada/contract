@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -21,6 +26,8 @@ export default function AIChatPage() {
   const [loading, setLoading] = useState(false);
   // 用于自动滚动到底部
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [drawioLoading, setDrawioLoading] = useState(true);
+  const [drawioError, setDrawioError] = useState<string | null>(null);
 
   // 每次 messages 更新时滚动到底部
   useEffect(() => {
@@ -189,107 +196,216 @@ export default function AIChatPage() {
     );
   };
 
+  // 处理与 draw.io 的通信
+  useEffect(() => {
+    const handleDrawioMessage = (evt: MessageEvent) => {
+      if (evt.data.length > 0) {
+        try {
+          const msg = JSON.parse(evt.data);
+          console.log("Received message from draw.io:", msg);
+
+          // 处理初始化完成事件
+          if (msg.event === "init") {
+            console.log("draw.io initialized");
+            const iframe =
+              document.querySelector<HTMLIFrameElement>("#drawioFrame");
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage(
+                JSON.stringify({
+                  action: "load",
+                  autosave: 1,
+                  noSaveBtn: 1,
+                  modified: false,
+                }),
+                "*",
+              );
+            }
+          }
+
+          // 处理加载完成事件
+          if (msg.event === "load") {
+            console.log("Diagram loaded");
+            setDrawioLoading(false);
+          }
+        } catch (e) {
+          console.error("Error processing draw.io message:", e);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleDrawioMessage);
+    return () => window.removeEventListener("message", handleDrawioMessage);
+  }, []);
+
+  const handleIframeLoad = () => {
+    console.log("iframe loaded successfully");
+  };
+
+  const handleIframeError = (
+    e: React.SyntheticEvent<HTMLIFrameElement, Event>,
+  ) => {
+    console.error("iframe loading error:", e);
+    setDrawioLoading(false);
+    setDrawioError("加载绘图工具失败，请检查服务是否可用");
+  };
+
+  // 构建完整的 draw.io URL
+  const drawioUrl = new URL(`${process.env.NEXT_PUBLIC_DRAWIO_URL}`);
+  const params = {
+    embed: "1",
+    proto: "json",
+    spin: "1",
+    lang: "zh",
+    noExitBtn: "1",
+    libraries: "1",
+    saveAndExit: "0",
+    chrome: "1",
+    toolbar: "1",
+    layers: "1",
+    nav: "1",
+    tags: "1",
+    border: "0",
+    zoom: "1",
+    math: "1",
+    height: "100%",
+    width: "100%",
+  };
+
+  Object.entries(params).forEach(([key, value]) => {
+    drawioUrl.searchParams.set(key, value);
+  });
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
-      <h1>AI 聊天</h1>
-      {/* 对话展示区域 */}
-      <div
-        style={{
-          border: "1px solid #ccc",
-          borderRadius: "8px",
-          padding: "1rem",
-          height: "75vh",
-          overflowY: "auto",
-          marginBottom: "1rem",
-          background: "#f9f9f9",
-        }}
-      >
-        {messages
-          .filter((msg) => msg.role !== "system") // 可选择是否显示系统提示
-          .map((msg, index) => (
-            <div
-              key={index}
-              style={{
-                marginBottom: "0.5rem",
-                textAlign: msg.role === "user" ? "right" : "left",
-              }}
-            >
-              <div
-                style={{
-                  display: "inline-block",
-                  backgroundColor: msg.role === "user" ? "#DCF8C6" : "#FFF",
-                  border: "1px solid #ccc",
-                  borderRadius: "8px",
-                  padding: "0.5rem",
-                  maxWidth: "80%",
-                  wordWrap: "break-word",
-                }}
-              >
-                <strong>{msg.role === "user" ? "你" : "AI"}</strong>:{" "}
-                {msg.role === "assistant" ? (
-                  <MessageContent content={msg.content} />
-                ) : (
-                  msg.content
-                )}
+    <ResizablePanelGroup direction="horizontal" className="min-h-screen">
+      {/* 左侧 draw.io 面板 */}
+      <ResizablePanel defaultSize={75} minSize={40}>
+        <div className="relative h-screen">
+          {drawioLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                <p className="mt-2">加载中...</p>
               </div>
             </div>
-          ))}
-        {loading && (
-          <div style={{ textAlign: "left", marginBottom: "0.5rem" }}>
-            AI 正在输入...
+          )}
+
+          {drawioError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+              <div className="text-center text-red-500 p-4">
+                <p>{drawioError}</p>
+                <button
+                  onClick={() => {
+                    setDrawioLoading(true);
+                    setDrawioError(null);
+                    const iframe =
+                      document.querySelector<HTMLIFrameElement>("#drawioFrame");
+                    if (iframe) {
+                      iframe.src = drawioUrl.toString();
+                    }
+                  }}
+                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  重试
+                </button>
+              </div>
+            </div>
+          )}
+
+          <iframe
+            id="drawioFrame"
+            src={drawioUrl.toString()}
+            className="w-full h-full border-0"
+            style={{
+              minHeight: "100vh",
+              backgroundColor: "#ffffff",
+            }}
+            frameBorder="0"
+            allowFullScreen
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            allow="fullscreen; clipboard-read; clipboard-write"
+          />
+        </div>
+      </ResizablePanel>
+
+      {/* 拖动手柄 */}
+      <ResizableHandle withHandle />
+
+      {/* 右侧主对话区域 */}
+      <ResizablePanel defaultSize={25} minSize={25}>
+        <div className="flex flex-col h-screen p-4">
+          <h1 className="text-2xl font-bold mb-4">DeepSeek R1 聊天</h1>
+
+          {/* 对话展示区域 */}
+          <div
+            className="flex-1 border border-gray-200 rounded-lg p-4 mb-4 overflow-y-auto"
+            style={{ height: "calc(100vh - 200px)" }}
+          >
+            {messages
+              .filter((msg) => msg.role !== "system")
+              .map((msg, index) => (
+                <div
+                  key={index}
+                  style={{
+                    marginBottom: "0.5rem",
+                    textAlign: msg.role === "user" ? "right" : "left",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "inline-block",
+                      backgroundColor: msg.role === "user" ? "#DCF8C6" : "#FFF",
+                      border: "1px solid #ccc",
+                      borderRadius: "8px",
+                      padding: "0.5rem",
+                      maxWidth: "80%",
+                      wordWrap: "break-word",
+                    }}
+                  >
+                    <strong>{msg.role === "user" ? "你" : "AI"}</strong>:{" "}
+                    {msg.role === "assistant" ? (
+                      <MessageContent content={msg.content} />
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
+                </div>
+              ))}
+            {loading && (
+              <div style={{ textAlign: "left", marginBottom: "0.5rem" }}>
+                AI 正在输入...
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-      {/* 输入区域 */}
-      <div style={{ display: "flex" }}>
-        <textarea
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="请输入消息..."
-          style={{
-            flex: 1,
-            padding: "0.5rem",
-            fontSize: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            resize: "none",
-            height: "100px",
-            minHeight: "80px",
-            maxHeight: "200px",
-            overflowY: "auto",
-            lineHeight: "1.5",
-            fontFamily: "inherit",
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (!loading && input.trim()) {
-                handleSend();
-              }
-            }
-          }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          style={{
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            marginLeft: "0.5rem",
-            border: "none",
-            borderRadius: "4px",
-            backgroundColor: "#0070f3",
-            color: "#fff",
-            cursor: "pointer",
-            alignSelf: "flex-end",
-            height: "40px",
-          }}
-        >
-          发送
-        </button>
-      </div>
-    </div>
+
+          {/* 输入区域 */}
+          <div className="flex gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="请输入消息..."
+              className="flex-1 p-2 border border-gray-300 rounded-lg resize-none"
+              style={{ height: "100px" }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (!loading && input.trim()) {
+                    handleSend();
+                  }
+                }
+              }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={loading || !input.trim()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

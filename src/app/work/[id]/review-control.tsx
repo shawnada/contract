@@ -68,6 +68,7 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
   }>({ current: 0, total: 0 });
   const [comments, setComments] = useState<Comment[]>([]);
   const [isAiReviewing, setIsAiReviewing] = useState(false);
+  const [isRuleReviewing, setIsRuleReviewing] = useState(false);
 
   // 移动 parseAIResponse 到组件内部
   const parseAIResponse = async (response: any): Promise<any[]> => {
@@ -1024,39 +1025,137 @@ export default function ReviewControl({ docId }: ReviewControlProps) {
     return response.json();
   };
 
+  const handleRuleReview = async () => {
+    if (!selectedStandard) return;
+
+    setIsRuleReviewing(true);
+    try {
+      const mainText = await getDocumentContent();
+      const standard = standards.find((s) => s.id === selectedStandard);
+      if (!standard) return;
+
+      const rules = await getRules(standard.id);
+      if (!rules || rules.length === 0) {
+        toast.error("未找到审核规则");
+        return;
+      }
+
+      // 设置进度信息
+      setReviewProgress({
+        current: 0,
+        total: rules.length,
+        currentRule: "",
+      });
+
+      // 逐条审核规则
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        setReviewProgress({
+          current: i + 1,
+          total: rules.length,
+          currentRule: rule.title || "",
+        });
+
+        try {
+          const response = await fetch("/api/rule-review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rule, mainText }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await parseAIResponse(await response.json());
+          if (Array.isArray(result)) {
+            for (const item of result) {
+              if (item.是否找到风险 === "是" && item.原文) {
+                console.log("发现风险项:", item);
+                await createComment({
+                  content: `${item.风险提示}${
+                    item.主要增加哪方的风险
+                      ? `\n主要增加${item.主要增加哪方的风险}的风险`
+                      : ""
+                  }`,
+                  additionalContent: item.修改建议,
+                  riskLevel: item.风险等级 as "高" | "中" | "低",
+                  userName: "System",
+                  rangeText: item.原文,
+                  autoExpand: false,
+                });
+                console.log("批注创建成功");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("规则审核失败:", error);
+          toast.error(`规则 "${rule.title}" 审核失败`);
+        }
+      }
+
+      toast.success("审核完成");
+    } catch (error) {
+      console.error("审核过程出错:", error);
+      toast.error("审核过程出错");
+    } finally {
+      setIsRuleReviewing(false);
+      setReviewProgress({
+        current: 0,
+        total: 0,
+        currentRule: "",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-none space-y-4">
-        <div className="flex gap-2 items-center">
-          <Select value={selectedStandard} onValueChange={setSelectedStandard}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="选择审核标准" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {standards.map((standard) => (
-                <SelectItem key={standard.id} value={standard.id}>
-                  {standard.title}{" "}
-                  {standard.user?.name ? `(${standard.user.name})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-4">
+          <div className="w-full">
+            <Select
+              value={selectedStandard}
+              onValueChange={setSelectedStandard}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择审核标准" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {standards.map((standard) => (
+                  <SelectItem key={standard.id} value={standard.id}>
+                    {standard.title}{" "}
+                    {standard.user?.name ? `(${standard.user.name})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Button
-            onClick={handleStrictReview}
-            className="bg-primary text-white hover:bg-primary/90"
-            disabled={!selectedStandard || isReviewing}
-          >
-            {isReviewing ? "审核中..." : "合同审核"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleStrictReview}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard || isReviewing}
+            >
+              {isReviewing ? "审核中..." : "合同审核"}
+            </Button>
 
-          <Button
-            onClick={handleAiReview}
-            className="bg-primary text-white hover:bg-primary/90"
-            disabled={!selectedStandard || isAiReviewing}
-          >
-            {isAiReviewing ? "审核中..." : "测试"}
-          </Button>
+            <Button
+              onClick={handleAiReview}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard || isAiReviewing}
+            >
+              {isAiReviewing ? "审核中..." : "病历质控测试"}
+            </Button>
+
+            <Button
+              onClick={handleRuleReview}
+              className="bg-primary text-white hover:bg-primary/90"
+              disabled={!selectedStandard || isRuleReviewing}
+            >
+              {isRuleReviewing ? "规则提炼中..." : "规则提炼"}
+            </Button>
+          </div>
         </div>
 
         {/* 进度条 */}
